@@ -37,7 +37,19 @@
 
             // 営業期間の最初の月を表示月として設定
             const period = getOperationPeriod();
-            currentDisplayMonth = parseDateStr(period.start);
+            console.log('[calendar:init] 営業期間:', period);
+            console.log('[calendar:init] DEMO_MODE:', CONFIG.DEMO_MODE);
+
+            const startDate = parseDateStr(period.start);
+            if (isNaN(startDate.getTime())) {
+                console.error('[calendar:init] 開始日のパースに失敗:', period.start);
+                // フォールバック: 2026年1月に設定
+                currentDisplayMonth = new Date(2026, 0, 1);
+            } else {
+                // 月の1日に設定
+                currentDisplayMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+            }
+            console.log('[calendar:init] 表示月:', currentDisplayMonth);
 
             populateStaffFilter();
             renderPeriodInfo();

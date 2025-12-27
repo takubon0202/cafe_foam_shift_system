@@ -24,6 +24,25 @@
         </nav>
 
         <main class="calendar-page">
+            <!-- 営業期間情報 -->
+            <section class="period-info" id="periodInfo">
+                <!-- JavaScriptで生成 -->
+            </section>
+
+            <!-- 月ナビゲーション -->
+            <section class="calendar-nav">
+                <div class="calendar-nav__controls">
+                    <button type="button" id="btnPrevMonth" class="calendar-nav__btn" aria-label="前月">
+                        <span class="calendar-nav__arrow">&lt;</span>
+                    </button>
+                    <h2 class="calendar-nav__title" id="monthTitle">2026年1月</h2>
+                    <button type="button" id="btnNextMonth" class="calendar-nav__btn" aria-label="次月">
+                        <span class="calendar-nav__arrow">&gt;</span>
+                    </button>
+                </div>
+                <button type="button" id="btnToday" class="calendar-nav__today" aria-label="今日の日付に移動">今日</button>
+            </section>
+
             <!-- フィルター -->
             <section class="card">
                 <div class="filter-row">
@@ -39,20 +58,20 @@
             <!-- 凡例 -->
             <section class="legend">
                 <div class="legend__item">
-                    <span class="legend__dot legend__dot--available"></span>
-                    <span>空きあり</span>
+                    <span class="legend__dot legend__dot--mine"></span>
+                    <span>自分のシフト</span>
                 </div>
                 <div class="legend__item">
                     <span class="legend__dot legend__dot--full"></span>
                     <span>人員充足</span>
                 </div>
                 <div class="legend__item">
-                    <span class="legend__dot legend__dot--shortage"></span>
-                    <span>人員不足</span>
+                    <span class="legend__dot legend__dot--available"></span>
+                    <span>一部申請あり</span>
                 </div>
                 <div class="legend__item">
-                    <span class="legend__dot legend__dot--mine"></span>
-                    <span>自分のシフト</span>
+                    <span class="legend__dot legend__dot--shortage"></span>
+                    <span>人員不足</span>
                 </div>
                 <div class="legend__item">
                     <span class="legend__dot legend__dot--closed"></span>

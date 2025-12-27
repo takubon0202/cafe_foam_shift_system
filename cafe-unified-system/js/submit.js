@@ -26,6 +26,12 @@
      * 初期化
      */
     async function init() {
+        console.log('[submit:init] 初期化開始');
+        console.log('[submit:init] DEMO_MODE:', CONFIG.DEMO_MODE);
+        console.log('[submit:init] OPERATION_PERIOD:', CONFIG.OPERATION_PERIOD);
+        console.log('[submit:init] WEEKS:', CONFIG.WEEKS);
+        console.log('[submit:init] getWeeks():', getWeeks());
+
         populateMemberSelect();
         setupEventListeners();
 
