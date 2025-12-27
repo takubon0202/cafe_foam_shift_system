@@ -21,7 +21,7 @@ const CONFIG = {
     DEMO_MODE: false,
 
     // 管理画面パスワード
-    ADMIN_PASSWORD: 'admin123',
+    ADMIN_PASSWORD: 'gakkan2025',
 
     // =======================================================================
     // カフェ情報

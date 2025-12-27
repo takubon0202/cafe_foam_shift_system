@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(responsive)",
+      "Skill(debug)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

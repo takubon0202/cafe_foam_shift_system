@@ -16,8 +16,6 @@
         btnSubmit: document.getElementById('btnSubmit'),
         myShiftsSection: document.getElementById('myShiftsSection'),
         myShiftsList: document.getElementById('myShiftsList'),
-        onboardingSection: document.getElementById('onboardingSection'),
-        btnCloseOnboarding: document.getElementById('btnCloseOnboarding'),
         btnClearSearch: document.getElementById('btnClearSearch')
     };
 
@@ -38,33 +36,11 @@
 
         populateMemberSelect();
         setupEventListeners();
-        initOnboarding();
 
         // シフトデータを読み込み
         await loadAllShifts();
 
         restoreLastSelection();
-    }
-
-    /**
-     * オンボーディングの初期化
-     */
-    function initOnboarding() {
-        // LocalStorageからオンボーディング表示状態を確認
-        const isHidden = Utils.getFromStorage('onboarding_hidden');
-        if (isHidden && elements.onboardingSection) {
-            elements.onboardingSection.style.display = 'none';
-        }
-
-        // 閉じるボタンのイベント
-        if (elements.btnCloseOnboarding) {
-            elements.btnCloseOnboarding.addEventListener('click', () => {
-                if (elements.onboardingSection) {
-                    elements.onboardingSection.style.display = 'none';
-                    Utils.saveToStorage('onboarding_hidden', true);
-                }
-            });
-        }
     }
 
     /**

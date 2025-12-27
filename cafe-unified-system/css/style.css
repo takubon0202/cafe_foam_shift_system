@@ -1454,17 +1454,169 @@ body {
    Responsive
    =========================================== */
 
+/* タブレット横向き (1024px以下) */
+@media screen and (max-width: 1024px) {
+    .calendar-day { min-height: 80px; }
+    .calendar-period { font-size: 11px; padding: 3px 4px; }
+}
+
+/* タブレット縦向き (768px以下) */
+@media screen and (max-width: 768px) {
+    .calendar-nav { padding: var(--spacing-md); }
+    .calendar-nav__title { font-size: var(--font-size-lg); }
+    .calendar-nav__btn { width: 48px; height: 48px; }
+    .calendar-nav__today {
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-size-sm);
+    }
+    .calendar-day { min-height: 75px; }
+    .calendar-period { font-size: 10px; padding: 2px 3px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: var(--spacing-md); }
+    .stat-item { padding: var(--spacing-md); }
+    .legend {
+        gap: var(--spacing-sm) var(--spacing-md);
+        justify-content: flex-start;
+    }
+    .legend__item {
+        flex: 0 0 auto;
+        font-size: var(--font-size-xs);
+    }
+}
+
+/* 大型スマホ (480px以下) */
 @media screen and (max-width: 480px) {
     .container { padding: var(--spacing-sm); }
-    .summary-grid, .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-sm);
+    }
+    .stat-item {
+        padding: var(--spacing-sm);
+    }
+    .stat-item__value {
+        font-size: var(--font-size-xl);
+    }
+    .stat-item__label {
+        font-size: var(--font-size-xs);
+    }
     .filter-row { flex-direction: column; }
+    .filter-hint { font-size: 11px; }
     .table th, .table td { padding: var(--spacing-xs); font-size: var(--font-size-xs); }
-    .calendar-grid { font-size: 10px; }
-    .calendar-day { min-height: 60px; }
-    .calendar-period { font-size: 10px; }
+
+    /* カレンダーグリッド改善 */
+    .calendar-grid {
+        font-size: 10px;
+        gap: 1px;
+    }
+    .calendar-header {
+        padding: var(--spacing-xs);
+        font-size: 11px;
+    }
+    .calendar-day {
+        min-height: 70px;
+        padding: 3px;
+    }
+    .calendar-day__date {
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+    .calendar-period {
+        font-size: 9px;
+        padding: 2px;
+        line-height: 1.2;
+    }
+    .calendar-day__note {
+        font-size: 8px;
+    }
+
+    /* 月ナビゲーション改善 */
+    .calendar-nav {
+        padding: var(--spacing-sm);
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+    .calendar-nav__controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .calendar-nav__btn {
+        width: 44px;
+        height: 44px;
+    }
+    .calendar-nav__title {
+        font-size: var(--font-size-base);
+    }
+    .calendar-nav__today {
+        width: 100%;
+        padding: var(--spacing-sm);
+        font-size: var(--font-size-sm);
+        text-align: center;
+    }
+
+    /* 凡例改善 */
+    .legend-section {
+        padding: var(--spacing-sm);
+    }
+    .legend-note {
+        font-size: 11px;
+        padding: var(--spacing-xs);
+    }
+    .legend {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-xs) var(--spacing-sm);
+    }
+    .legend__item {
+        font-size: 11px;
+    }
+    .legend__dot {
+        width: 10px;
+        height: 10px;
+    }
+
     .slot-options { grid-template-columns: 1fr 1fr; }
     .clock-buttons { grid-template-columns: 1fr; gap: var(--spacing-sm); }
     .button-group { grid-template-columns: 1fr; }
+}
+
+/* 小型スマホ (360px以下) */
+@media screen and (max-width: 360px) {
+    .calendar-day {
+        min-height: 65px;
+        padding: 2px;
+    }
+    .calendar-day__date {
+        font-size: 11px;
+    }
+    .calendar-period {
+        font-size: 8px;
+        padding: 1px 2px;
+    }
+    .calendar-nav__title {
+        font-size: var(--font-size-sm);
+    }
+    .legend {
+        grid-template-columns: 1fr;
+    }
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* タッチデバイス最適化 */
+@media (pointer: coarse) {
+    .calendar-day {
+        min-height: 72px;
+    }
+    .calendar-nav__btn,
+    .calendar-nav__today {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    .calendar-day:active {
+        background-color: var(--color-primary-bg);
+    }
 }
 
 /* ===========================================
