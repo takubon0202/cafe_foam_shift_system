@@ -101,7 +101,7 @@
     function populateStaffFilter() {
         const options = CONFIG.STAFF_LIST.map(staff => {
             const roleLabel = CONFIG.ROLES[staff.role]?.label || '';
-            const roleSuffix = roleLabel === 'リーダー' ? '（リーダー）' : '';
+            const roleSuffix = roleLabel && roleLabel !== 'スタッフ' ? `（${roleLabel}）` : '';
             return `<option value="${staff.id}">${staff.name}${roleSuffix}</option>`;
         }).join('');
         elements.filterStaff.innerHTML = '<option value="">全員表示</option>' + options;

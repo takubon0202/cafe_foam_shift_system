@@ -213,7 +213,7 @@ const CONFIG = {
         { id: '25011627', name: '加藤 大青', role: 'staff' },
         { id: '25011690', name: '木村 苺香', role: 'staff' },
         { id: '25011698', name: '佐々 眞陽', role: 'staff' },
-        { id: '25011754', name: '山﨑 琢己', role: 'leader' },
+        { id: '25011754', name: '山﨑 琢己', role: 'admin' },
         { id: '25011845', name: '延谷 碧', role: 'staff' },
         { id: '25011920', name: '佐藤 斗和', role: 'staff' },
         { id: '25011958', name: '渡邉 瑛介', role: 'staff' },
@@ -222,6 +222,7 @@ const CONFIG = {
 
     // 役割定義
     ROLES: {
+        admin: { label: '管理者', color: '#DC2626' },
         leader: { label: 'リーダー', color: '#FF9800' },
         staff: { label: 'スタッフ', color: '#16a34a' }
     },

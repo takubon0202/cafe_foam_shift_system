@@ -85,7 +85,7 @@
     function populateMemberSelect() {
         const options = CONFIG.STAFF_LIST.map(staff => {
             const roleLabel = CONFIG.ROLES[staff.role]?.label || '';
-            const roleSuffix = roleLabel === 'リーダー' ? '（リーダー）' : '';
+            const roleSuffix = roleLabel && roleLabel !== 'スタッフ' ? `（${roleLabel}）` : '';
             return `<option value="${staff.id}">${staff.id} - ${staff.name}${roleSuffix}</option>`;
         }).join('');
 

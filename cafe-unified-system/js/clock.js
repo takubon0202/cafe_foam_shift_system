@@ -100,7 +100,7 @@
     function populateStaffSelect() {
         const options = CONFIG.STAFF_LIST.map(staff => {
             const roleLabel = CONFIG.ROLES[staff.role]?.label || '';
-            const roleTag = roleLabel === 'リーダー' ? '（リーダー）' : '';
+            const roleTag = roleLabel && roleLabel !== 'スタッフ' ? `（${roleLabel}）` : '';
             return `<option value="${staff.id}">${staff.name}（${staff.id}）${roleTag}</option>`;
         }).join('');
 
