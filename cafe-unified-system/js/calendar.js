@@ -1,6 +1,6 @@
 /**
  * 共創カフェ 統合シフト・勤怠管理システム - カレンダー画面
- * v2.0 - GAS連携対応・リアルタイム更新
+ * v3.0 - 月別表示・ナビゲーション・特別日対応
  */
 
 (function() {
@@ -8,6 +8,11 @@
 
     const elements = {
         filterStaff: document.getElementById('filterStaff'),
+        periodInfo: document.getElementById('periodInfo'),
+        monthTitle: document.getElementById('monthTitle'),
+        btnPrevMonth: document.getElementById('btnPrevMonth'),
+        btnNextMonth: document.getElementById('btnNextMonth'),
+        btnToday: document.getElementById('btnToday'),
         calendarGrid: document.getElementById('calendarGrid'),
         dayDetail: document.getElementById('dayDetail'),
         selectedDateTitle: document.getElementById('selectedDateTitle'),
@@ -21,6 +26,7 @@
 
     let allShiftRequests = [];
     let selectedDate = null;
+    let currentDisplayMonth = null; // 現在表示中の月 (Date)
 
     /**
      * 初期化
@@ -28,7 +34,13 @@
     async function init() {
         try {
             Utils.showLoading(true, 'データを読み込み中...');
+
+            // 営業期間の最初の月を表示月として設定
+            const period = getOperationPeriod();
+            currentDisplayMonth = parseDateStr(period.start);
+
             populateStaffFilter();
+            renderPeriodInfo();
             setupEventListeners();
             await loadShiftData();
         } catch (error) {
@@ -40,15 +52,46 @@
     }
 
     /**
+     * 営業期間情報を表示
+     */
+    function renderPeriodInfo() {
+        if (!elements.periodInfo) return;
+
+        const period = CONFIG.OPERATION_PERIOD;
+        const startDate = parseDateStr(period.start);
+        const endDate = parseDateStr(period.end);
+
+        const formatDate = (d) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+
+        let html = `
+            <div class="period-info__badge">プレオープン期間</div>
+            <div class="period-info__dates">${formatDate(startDate)} 〜 ${formatDate(endDate)}</div>
+        `;
+
+        // 特別日情報
+        if (CONFIG.SPECIAL_DATES) {
+            const specialDays = Object.entries(CONFIG.SPECIAL_DATES).map(([date, info]) => {
+                const d = parseDateStr(date);
+                return `${d.getMonth() + 1}/${d.getDate()} ${info.label}`;
+            });
+            if (specialDays.length > 0) {
+                html += `<div class="period-info__special">${specialDays.join(' / ')}</div>`;
+            }
+        }
+
+        elements.periodInfo.innerHTML = html;
+    }
+
+    /**
      * スタッフフィルターを生成
      */
     function populateStaffFilter() {
         const options = CONFIG.STAFF_LIST.map(staff => {
             const roleLabel = CONFIG.ROLES[staff.role]?.label || '';
             const roleSuffix = roleLabel === 'リーダー' ? '（リーダー）' : '';
-            return `<option value="${staff.id}">${staff.name}${roleSuffix}（${staff.id}）</option>`;
+            return `<option value="${staff.id}">${staff.name}${roleSuffix}</option>`;
         }).join('');
-        elements.filterStaff.innerHTML = '<option value="">全員</option>' + options;
+        elements.filterStaff.innerHTML = '<option value="">全員表示</option>' + options;
 
         // 前回選択したスタッフを復元
         const lastStaffId = Utils.getFromStorage(CONFIG.STORAGE_KEYS.LAST_STAFF_ID);
@@ -66,11 +109,62 @@
             updateStats();
         });
 
-        // 更新ボタンがあれば
+        // 月ナビゲーション
+        if (elements.btnPrevMonth) {
+            elements.btnPrevMonth.addEventListener('click', () => navigateMonth(-1));
+        }
+        if (elements.btnNextMonth) {
+            elements.btnNextMonth.addEventListener('click', () => navigateMonth(1));
+        }
+        if (elements.btnToday) {
+            elements.btnToday.addEventListener('click', goToToday);
+        }
+
+        // 更新ボタン
         if (elements.btnRefresh) {
             elements.btnRefresh.addEventListener('click', async () => {
                 await loadShiftData();
             });
+        }
+    }
+
+    /**
+     * 月を移動
+     */
+    function navigateMonth(delta) {
+        currentDisplayMonth.setMonth(currentDisplayMonth.getMonth() + delta);
+        renderCalendar();
+        updateMonthTitle();
+    }
+
+    /**
+     * 今日の月へ移動（営業期間内の場合）
+     */
+    function goToToday() {
+        const today = new Date();
+        const period = getOperationPeriod();
+        const startDate = parseDateStr(period.start);
+        const endDate = parseDateStr(period.end);
+
+        // 営業期間内なら今日へ、そうでなければ開始月へ
+        if (today >= startDate && today <= endDate) {
+            currentDisplayMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        } else {
+            currentDisplayMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        }
+
+        renderCalendar();
+        updateMonthTitle();
+    }
+
+    /**
+     * 月タイトルを更新
+     */
+    function updateMonthTitle() {
+        if (elements.monthTitle) {
+            const year = currentDisplayMonth.getFullYear();
+            const month = currentDisplayMonth.getMonth() + 1;
+            elements.monthTitle.textContent = `${year}年${month}月`;
         }
     }
 
@@ -93,46 +187,75 @@
                 console.log('[calendar:loadShiftData] GASレスポンス:', response);
 
                 if (response.success && response.shifts) {
-                    // GASのデータで上書き（GASが正）
                     allShiftRequests = response.shifts;
-                    // ローカルストレージも同期
                     Utils.saveToStorage(CONFIG.STORAGE_KEYS.SHIFTS, allShiftRequests);
                     console.log('[calendar:loadShiftData] GASからシフトデータを取得:', allShiftRequests.length, '件');
-                } else {
-                    console.warn('[calendar:loadShiftData] GASレスポンスにshiftsがない:', response);
                 }
             } catch (error) {
-                console.warn('[calendar:loadShiftData] GASからのデータ取得に失敗、ローカルデータを使用:', error);
+                console.warn('[calendar:loadShiftData] GASからのデータ取得に失敗:', error);
             } finally {
                 Utils.showLoading(false);
             }
-        } else {
-            console.log('[calendar:loadShiftData] GAS未設定、ローカルデータのみ使用');
         }
 
-        // データを正規化（日付とIDを文字列に）
-        allShiftRequests = allShiftRequests.map(shift => ({
-            ...shift,
-            date: String(shift.date || '').split('T')[0],  // ISO形式の場合も対応
-            staffId: String(shift.staffId || ''),
-            slotId: String(shift.slotId || '')
-        }));
-
-        console.log('[calendar:loadShiftData] 最終データ:', allShiftRequests.length, '件');
-        if (allShiftRequests.length > 0) {
-            console.log('[calendar:loadShiftData] サンプル:', allShiftRequests[0]);
-        }
+        // データを正規化
+        allShiftRequests = allShiftRequests.map(shift => {
+            let dateStr = normalizeCalendarDate(shift.date);
+            return {
+                ...shift,
+                date: dateStr,
+                staffId: String(shift.staffId || ''),
+                slotId: String(shift.slotId || '')
+            };
+        });
 
         renderCalendar();
         updateStats();
+        updateMonthTitle();
     }
 
     /**
-     * 日付文字列をパース
+     * 日付文字列を正規化
      */
-    function parseDateStr(dateStr) {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        return new Date(year, month - 1, day);
+    function normalizeCalendarDate(dateValue) {
+        if (!dateValue || dateValue === 'undefined' || dateValue === 'null') {
+            return '';
+        }
+
+        if (typeof dateValue === 'object' && dateValue instanceof Date) {
+            return formatDateStr(dateValue);
+        }
+
+        if (typeof dateValue === 'string') {
+            let str = dateValue.startsWith("'") ? dateValue.substring(1) : dateValue;
+
+            if (str.startsWith('1899') || str.startsWith('1900')) {
+                return '';
+            }
+
+            if (str.includes('T')) {
+                try {
+                    const date = new Date(str);
+                    if (!isNaN(date.getTime())) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    }
+                } catch (e) {
+                    console.warn('[normalizeCalendarDate] パースエラー:', str, e);
+                }
+                str = str.split('T')[0];
+            }
+
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                return str;
+            }
+
+            return str;
+        }
+
+        return String(dateValue);
     }
 
     /**
@@ -144,42 +267,85 @@
         const today = Utils.formatDate();
 
         // ヘッダー行
-        let html = weekdays.map(w => `<div class="calendar-header">${w}</div>`).join('');
+        let html = weekdays.map((w, i) => {
+            let cls = 'calendar-header';
+            if (i === 0) cls += ' calendar-header--sun';
+            if (i === 6) cls += ' calendar-header--sat';
+            return `<div class="${cls}">${w}</div>`;
+        }).join('');
 
-        // 期間の開始日を取得
-        const period = getOperationPeriod();
-        const startDate = parseDateStr(period.start);
-        const endDate = parseDateStr(period.end);
+        // 現在表示中の月の1日
+        const year = currentDisplayMonth.getFullYear();
+        const month = currentDisplayMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
 
-        // 開始日の週の日曜日から始める
-        const calendarStart = new Date(startDate);
+        // カレンダーの開始日（前月の日曜日から）
+        const calendarStart = new Date(firstDay);
         calendarStart.setDate(calendarStart.getDate() - calendarStart.getDay());
 
-        // 終了日の週の土曜日まで
-        const calendarEnd = new Date(endDate);
+        // カレンダーの終了日（次月の土曜日まで）
+        const calendarEnd = new Date(lastDay);
         calendarEnd.setDate(calendarEnd.getDate() + (6 - calendarEnd.getDay()));
+
+        // 営業期間を取得
+        const period = getOperationPeriod();
+        const periodStart = parseDateStr(period.start);
+        const periodEnd = parseDateStr(period.end);
 
         // カレンダーを生成
         let currentDate = new Date(calendarStart);
+        let weekHtml = '';
+
         while (currentDate <= calendarEnd) {
-            const dateStr = Utils.formatDate(currentDate);
-            const opDate = getOperationDate(dateStr);
+            const dateStr = formatDateStr(currentDate);
+            const isCurrentMonth = currentDate.getMonth() === month;
             const isToday = dateStr === today;
             const isSelected = dateStr === selectedDate;
+            const dayOfWeek = currentDate.getDay();
+            const opDate = getOperationDate(dateStr);
 
-            if (!opDate) {
-                // 営業日でない
-                html += `<div class="calendar-day calendar-day--empty">
-                    <div class="calendar-day__date">${currentDate.getDate()}</div>
-                </div>`;
+            // 営業期間内かどうか
+            const isInPeriod = currentDate >= periodStart && currentDate <= periodEnd;
+
+            // 特別日かどうか
+            const specialInfo = CONFIG.SPECIAL_DATES?.[dateStr];
+            const isSpecial = !!specialInfo;
+
+            let dayClass = 'calendar-day';
+            if (!isCurrentMonth) dayClass += ' calendar-day--other-month';
+            if (isToday) dayClass += ' calendar-day--today';
+            if (isSelected) dayClass += ' calendar-day--selected';
+            if (dayOfWeek === 0) dayClass += ' calendar-day--sun';
+            if (dayOfWeek === 6) dayClass += ' calendar-day--sat';
+            if (isSpecial) dayClass += ' calendar-day--special';
+
+            if (!opDate || !isInPeriod) {
+                dayClass += ' calendar-day--empty';
+                html += `
+                    <div class="${dayClass}">
+                        <div class="calendar-day__date">${currentDate.getDate()}</div>
+                        ${!isInPeriod && isCurrentMonth ? '<div class="calendar-day__note">営業なし</div>' : ''}
+                    </div>
+                `;
             } else {
                 const dayShifts = allShiftRequests.filter(r => r.date === dateStr);
-                const slotsHtml = renderDaySlots(dateStr, dayShifts, selectedStaffId);
+                const slotsHtml = renderDaySlots(dateStr, dayShifts, selectedStaffId, opDate);
+
+                // 特別日ラベル
+                let specialLabel = '';
+                if (isSpecial) {
+                    specialLabel = `<div class="calendar-day__special-label">${specialInfo.label}</div>`;
+                } else if (opDate.label) {
+                    specialLabel = `<div class="calendar-day__label">${opDate.label}</div>`;
+                }
 
                 html += `
-                    <div class="calendar-day ${isToday ? 'calendar-day--today' : ''} ${isSelected ? 'calendar-day--selected' : ''}"
-                         data-date="${dateStr}">
-                        <div class="calendar-day__date">${currentDate.getDate()}</div>
+                    <div class="${dayClass}" data-date="${dateStr}">
+                        <div class="calendar-day__header">
+                            <span class="calendar-day__date">${currentDate.getDate()}</span>
+                            ${specialLabel}
+                        </div>
                         <div class="calendar-day__slots">
                             ${slotsHtml}
                         </div>
@@ -201,39 +367,50 @@
     /**
      * 日付のスロットをレンダリング
      */
-    function renderDaySlots(dateStr, dayShifts, selectedStaffId) {
+    function renderDaySlots(dateStr, dayShifts, selectedStaffId, opDate) {
         let html = '';
-        const availableSlots = getAvailableSlots(dateStr);
 
-        Object.entries(CONFIG.SHIFT_SLOTS).forEach(([slotId, slot]) => {
-            const isAvailable = availableSlots.some(s => s.id === slotId);
+        // 午前・午後でグループ化
+        const periods = [
+            { label: '午前', slots: ['AM_A', 'AM_B'], has: opDate.hasMorning },
+            { label: '午後', slots: ['PM_A', 'PM_B'], has: opDate.hasAfternoon }
+        ];
 
-            if (!isAvailable) {
-                html += `<div class="calendar-slot calendar-slot--closed">${slot.label} -</div>`;
-                return;
-            }
+        periods.forEach(period => {
+            if (!period.has) return;
 
-            // slotIdを文字列として比較
-            const slotShifts = dayShifts.filter(s => String(s.slotId) === String(slotId));
-            const count = slotShifts.length;
-            // 枠ごとの必要人数を取得（getRequiredStaff関数を使用）
-            const required = getRequiredStaff(slotId);
-            // staffIdも文字列として比較
-            const isMine = selectedStaffId && slotShifts.some(s => String(s.staffId) === String(selectedStaffId));
+            let periodTotal = 0;
+            let periodFilled = 0;
+            let hasMine = false;
 
-            let statusClass = '';
-            if (isMine) {
-                statusClass = 'calendar-slot--mine';
-            } else if (count >= required) {
-                statusClass = 'calendar-slot--full';
-            } else if (count > 0) {
-                statusClass = 'calendar-slot--available';
+            period.slots.forEach(slotId => {
+                const slot = CONFIG.SHIFT_SLOTS[slotId];
+                if (!slot) return;
+
+                const slotShifts = dayShifts.filter(s => String(s.slotId) === slotId);
+                const count = slotShifts.length;
+                const required = getRequiredStaff(slotId);
+
+                periodTotal += required;
+                periodFilled += Math.min(count, required);
+
+                if (selectedStaffId && slotShifts.some(s => String(s.staffId) === selectedStaffId)) {
+                    hasMine = true;
+                }
+            });
+
+            let statusClass = 'calendar-period';
+            if (hasMine) {
+                statusClass += ' calendar-period--mine';
+            } else if (periodFilled >= periodTotal) {
+                statusClass += ' calendar-period--full';
+            } else if (periodFilled > 0) {
+                statusClass += ' calendar-period--partial';
             } else {
-                statusClass = 'calendar-slot--shortage';
+                statusClass += ' calendar-period--empty';
             }
 
-            // 3人以上登録可能（上限なし）- 充足状態のみ表示
-            html += `<div class="calendar-slot ${statusClass}">${slot.label} ${count}/${required}</div>`;
+            html += `<div class="${statusClass}">${period.label} ${periodFilled}/${periodTotal}</div>`;
         });
 
         return html;
@@ -248,8 +425,17 @@
 
         const date = parseDateStr(dateStr);
         const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-        elements.selectedDateTitle.textContent =
-            `${date.getMonth() + 1}/${date.getDate()}（${weekdays[date.getDay()]}）のシフト`;
+        const specialInfo = CONFIG.SPECIAL_DATES?.[dateStr];
+        const opDate = CONFIG.OPERATION_DATES.find(d => d.date === dateStr);
+
+        let titleText = `${date.getMonth() + 1}月${date.getDate()}日（${weekdays[date.getDay()]}）`;
+        if (specialInfo) {
+            titleText += ` - ${specialInfo.label}`;
+        } else if (opDate?.label) {
+            titleText += ` - ${opDate.label}`;
+        }
+
+        elements.selectedDateTitle.textContent = titleText;
 
         const dayShifts = allShiftRequests.filter(r => r.date === dateStr);
         const availableSlots = getAvailableSlots(dateStr);
@@ -257,26 +443,23 @@
 
         Object.entries(CONFIG.SHIFT_SLOTS).forEach(([slotId, slot]) => {
             const isAvailable = availableSlots.some(s => s.id === slotId);
-            // slotIdを文字列として比較
-            const slotShifts = dayShifts.filter(s => String(s.slotId) === String(slotId));
+            const slotShifts = dayShifts.filter(s => String(s.slotId) === slotId);
             const count = slotShifts.length;
-            // 枠ごとの必要人数を取得
             const required = getRequiredStaff(slotId);
 
-            // ステータスクラス
-            let statusClass = '';
+            let statusClass = 'day-detail__slot';
             if (!isAvailable) {
-                statusClass = 'day-detail__slot--closed';
+                statusClass += ' day-detail__slot--closed';
             } else if (count >= required) {
-                statusClass = 'day-detail__slot--full';
+                statusClass += ' day-detail__slot--full';
             } else if (count > 0) {
-                statusClass = 'day-detail__slot--partial';
+                statusClass += ' day-detail__slot--partial';
             } else {
-                statusClass = 'day-detail__slot--empty';
+                statusClass += ' day-detail__slot--empty';
             }
 
             html += `
-                <div class="day-detail__slot ${statusClass}">
+                <div class="${statusClass}">
                     <div class="day-detail__slot-header">
                         <span class="day-detail__slot-label">${slot.label}（${slot.start}〜${slot.end}）</span>
                         <span class="day-detail__slot-count">${isAvailable ? `${count}/${required}名` : '営業なし'}</span>
@@ -285,16 +468,15 @@
             `;
 
             if (!isAvailable) {
-                html += `<span class="day-detail__empty">この日は${slot.label}営業なし</span>`;
+                html += `<span class="day-detail__empty">この時間帯は営業していません</span>`;
             } else if (slotShifts.length > 0) {
                 slotShifts.forEach(shift => {
-                    html += `<span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}（${shift.staffId}）</span>`;
+                    html += `<span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>`;
                 });
-                // 残り必要人数（上限なし - 充足状態のみ表示）
                 if (count < required) {
                     html += `<span class="day-detail__need">あと${required - count}名必要</span>`;
                 } else {
-                    html += `<span class="day-detail__sufficient">必要人数達成</span>`;
+                    html += `<span class="day-detail__sufficient">人員充足</span>`;
                 }
             } else {
                 html += `<span class="day-detail__empty">申請者なし（${required}名必要）</span>`;
@@ -317,28 +499,19 @@
         const selectedStaffId = elements.filterStaff.value;
         const operationDates = getOperationDates();
 
-        // 総枠数（営業している枠のみ）
         let totalSlots = 0;
-        operationDates.forEach(dateStr => {
-            const slots = getAvailableSlots(dateStr);
-            totalSlots += slots.length;
-        });
-        elements.statTotalSlots.textContent = totalSlots;
-
-        // 充足枠数（必要人数を満たしている枠）
         let filledSlots = 0;
         let shortageCount = 0;
 
         operationDates.forEach(dateStr => {
-            const availableSlots = getAvailableSlots(dateStr);
-            availableSlots.forEach(slot => {
-                // 日付とslotIdを文字列として比較
+            const slots = getAvailableSlots(dateStr);
+            slots.forEach(slot => {
+                totalSlots++;
                 const count = allShiftRequests.filter(r =>
-                    String(r.date) === String(dateStr) && String(r.slotId) === String(slot.id)
+                    String(r.date) === dateStr && String(r.slotId) === slot.id
                 ).length;
-
-                // 枠ごとの必要人数を取得
                 const required = getRequiredStaff(slot.id);
+
                 if (count >= required) {
                     filledSlots++;
                 } else {
@@ -347,16 +520,17 @@
             });
         });
 
-        elements.statFilledSlots.textContent = filledSlots;
-        elements.statShortageSlots.textContent = shortageCount;
+        if (elements.statTotalSlots) elements.statTotalSlots.textContent = totalSlots;
+        if (elements.statFilledSlots) elements.statFilledSlots.textContent = filledSlots;
+        if (elements.statShortageSlots) elements.statShortageSlots.textContent = shortageCount;
 
-        // 自分の枠数
-        if (selectedStaffId) {
-            // staffIdを文字列として比較
-            const myShifts = allShiftRequests.filter(r => String(r.staffId) === String(selectedStaffId));
-            elements.statMyShifts.textContent = myShifts.length;
-        } else {
-            elements.statMyShifts.textContent = '-';
+        if (elements.statMyShifts) {
+            if (selectedStaffId) {
+                const myShifts = allShiftRequests.filter(r => String(r.staffId) === selectedStaffId);
+                elements.statMyShifts.textContent = myShifts.length;
+            } else {
+                elements.statMyShifts.textContent = '-';
+            }
         }
     }
 

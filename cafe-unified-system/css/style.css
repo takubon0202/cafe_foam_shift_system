@@ -724,10 +724,10 @@ body {
     border-radius: 2px;
 }
 
-.legend__dot--available { background-color: var(--color-primary-light); }
-.legend__dot--full { background-color: #C8E6C9; }
-.legend__dot--shortage { background-color: #FFCDD2; }
-.legend__dot--mine { background-color: #BBDEFB; }
+.legend__dot--available { background-color: #fffbeb; border: 1px solid #d97706; }
+.legend__dot--full { background-color: #f0fdf4; border: 1px solid var(--color-primary); }
+.legend__dot--shortage { background-color: #fef2f2; border: 1px solid var(--color-error); }
+.legend__dot--mine { background-color: var(--color-primary); }
 .legend__dot--closed { background-color: #EEEEEE; }
 
 /* Day Detail */
@@ -756,6 +756,296 @@ body {
 .day-detail__staff { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); }
 .day-detail__staff-name { padding: var(--spacing-xs) var(--spacing-sm); background-color: var(--color-white); border-radius: var(--radius-sm); font-size: var(--font-size-sm); }
 .day-detail__empty { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+/* ===========================================
+   Period Info & Calendar Navigation
+   =========================================== */
+
+/* 営業期間情報 */
+.period-info {
+    margin-bottom: var(--spacing-md);
+}
+
+.period-info__badge {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-md);
+    background-color: var(--color-primary);
+    color: var(--color-white);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.period-info__badge--reception {
+    background-color: #7C3AED;
+}
+
+.period-info__badge--preopen {
+    background-color: #059669;
+}
+
+.period-info__badge--grandopen {
+    background-color: #DC2626;
+}
+
+.period-info__dates {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-light);
+    margin-bottom: var(--spacing-sm);
+}
+
+.period-info__special {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+}
+
+.period-info__special-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background-color: #F3E8FF;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+}
+
+.period-info__special-date {
+    font-weight: 600;
+    color: #7C3AED;
+}
+
+.period-info__special-label {
+    color: var(--color-text);
+}
+
+.period-info__special-note {
+    color: var(--color-text-light);
+    font-size: var(--font-size-xs);
+}
+
+/* 月ナビゲーション */
+.calendar-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--color-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.calendar-nav__controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.calendar-nav__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background-color: var(--color-bg);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.calendar-nav__btn:hover {
+    background-color: var(--color-primary-bg);
+    border-color: var(--color-primary);
+}
+
+.calendar-nav__btn:active {
+    transform: scale(0.95);
+}
+
+.calendar-nav__arrow {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.calendar-nav__title {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text);
+    min-width: 140px;
+    text-align: center;
+}
+
+.calendar-nav__today {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-primary);
+    background-color: var(--color-primary-bg);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.calendar-nav__today:hover {
+    background-color: var(--color-primary);
+    color: var(--color-white);
+}
+
+/* カレンダー日付 - 特別な日 */
+.calendar-day--special {
+    background-color: #F3E8FF;
+}
+
+.calendar-day--special:hover {
+    background-color: #E9D5FF;
+}
+
+.calendar-day__special-label {
+    font-size: 9px;
+    color: #7C3AED;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+/* 午前・午後グループ */
+.calendar-day__period-group {
+    margin-bottom: 2px;
+}
+
+.calendar-day__period-label {
+    font-size: 8px;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    margin-bottom: 1px;
+}
+
+/* カレンダー日詳細 - 午前/午後グループ */
+.day-detail__period {
+    margin-bottom: var(--spacing-md);
+}
+
+.day-detail__period:last-child {
+    margin-bottom: 0;
+}
+
+.day-detail__period-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background-color: var(--color-bg);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.day-detail__period-label {
+    font-weight: 600;
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+}
+
+.day-detail__period-badge {
+    padding: 2px 8px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-dark);
+}
+
+.day-detail__period-badge--closed {
+    background-color: #EEEEEE;
+    color: var(--color-text-muted);
+}
+
+.day-detail__period-slots {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* カレンダー期間表示（午前・午後） */
+.calendar-period {
+    padding: 2px 4px;
+    font-size: 9px;
+    border-radius: 2px;
+    text-align: center;
+    margin-bottom: 1px;
+}
+
+.calendar-period--mine {
+    background-color: var(--color-primary);
+    color: var(--color-white);
+    font-weight: 700;
+}
+
+.calendar-period--full {
+    background-color: #f0fdf4;
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+}
+
+.calendar-period--partial {
+    background-color: #fffbeb;
+    color: #d97706;
+    border: 1px solid #d97706;
+}
+
+.calendar-period--empty {
+    background-color: #fef2f2;
+    color: var(--color-error);
+    border: 1px solid var(--color-error);
+}
+
+/* カレンダー日付ラベル */
+.calendar-day__label {
+    font-size: 8px;
+    color: var(--color-primary);
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.calendar-day__note {
+    font-size: 8px;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin-top: 4px;
+}
+
+.calendar-day__header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    margin-bottom: 2px;
+}
+
+/* 他の月の日付 */
+.calendar-day--other-month {
+    opacity: 0.4;
+}
+
+.calendar-day--other-month .calendar-day__date {
+    color: var(--color-text-muted);
+}
+
+/* 日曜・土曜 */
+.calendar-header--sun,
+.calendar-day--sun .calendar-day__date {
+    color: #DC2626;
+}
+
+.calendar-header--sat,
+.calendar-day--sat .calendar-day__date {
+    color: #2563EB;
+}
 
 /* Stats Grid */
 .stats-grid {

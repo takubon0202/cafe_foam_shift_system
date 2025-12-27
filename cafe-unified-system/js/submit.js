@@ -491,34 +491,23 @@
 
     /**
      * シフトデータを正規化（GASからのデータ形式を統一）
+     * タイムゾーンを考慮した堅牢な日付処理
      */
     function normalizeShiftData(shift) {
         // 日付の正規化
-        let dateStr = shift.date;
-        if (!dateStr || dateStr === 'undefined') {
-            dateStr = '';
-        } else if (typeof dateStr === 'object' && dateStr instanceof Date) {
-            dateStr = formatDateStr(dateStr);
-        } else if (typeof dateStr === 'string') {
-            // ISO形式（2024-12-27T...）の場合
-            if (dateStr.includes('T')) {
-                dateStr = dateStr.split('T')[0];
-            }
-            // 1899年の無効な日付をスキップ
-            if (dateStr.startsWith('1899') || dateStr.startsWith('1900')) {
-                dateStr = '';
-            }
-        }
+        let dateStr = normalizeDateString(shift.date);
 
         // 時刻の正規化（ISO形式からHH:MM形式へ）
         let startTime = shift.startTime || '';
         let endTime = shift.endTime || '';
 
-        // ISO形式の場合はCONFIGから取得
-        if (startTime.includes('T') || startTime.includes('1899') || startTime.includes('1900')) {
+        // ISO形式または無効な形式の場合はCONFIGから取得
+        if (!startTime || startTime.includes('T') || startTime.includes('1899') || startTime.includes('1900')) {
             const slot = CONFIG.SHIFT_SLOTS[shift.slotId];
-            startTime = slot ? slot.start : '';
-            endTime = slot ? slot.end : '';
+            if (slot) {
+                startTime = slot.start;
+                endTime = slot.end;
+            }
         }
 
         // slotLabelの正規化
@@ -535,6 +524,61 @@
             endTime: endTime,
             slotLabel: slotLabel
         };
+    }
+
+    /**
+     * 日付文字列を正規化（YYYY-MM-DD形式に統一）
+     * ISO形式の場合はタイムゾーンを考慮して正しい日付を抽出
+     */
+    function normalizeDateString(dateValue) {
+        if (!dateValue || dateValue === 'undefined' || dateValue === 'null') {
+            return '';
+        }
+
+        // Dateオブジェクトの場合
+        if (typeof dateValue === 'object' && dateValue instanceof Date) {
+            return formatDateStr(dateValue);
+        }
+
+        // 文字列の場合
+        if (typeof dateValue === 'string') {
+            // アポストロフィを除去
+            let str = dateValue.startsWith("'") ? dateValue.substring(1) : dateValue;
+
+            // 1899/1900年の無効な日付をスキップ
+            if (str.startsWith('1899') || str.startsWith('1900')) {
+                return '';
+            }
+
+            // ISO形式 (例: 2024-12-21T15:00:00.000Z) の場合
+            // タイムゾーンを考慮して日本時間での日付を取得
+            if (str.includes('T')) {
+                try {
+                    const date = new Date(str);
+                    if (!isNaN(date.getTime())) {
+                        // ローカルタイムゾーン（日本）での日付を取得
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    }
+                } catch (e) {
+                    console.warn('[normalizeDateString] ISO日付のパースに失敗:', str, e);
+                }
+                // パース失敗時はTより前を使用
+                str = str.split('T')[0];
+            }
+
+            // YYYY-MM-DD形式かチェック
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+                return str;
+            }
+
+            // その他の形式
+            return str;
+        }
+
+        return String(dateValue);
     }
 
     /**

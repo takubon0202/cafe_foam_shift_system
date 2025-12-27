@@ -29,6 +29,59 @@ const LATE_THRESHOLD = 5;    // 5分以上遅刻
 const EARLY_THRESHOLD = 15;  // 15分以上早退
 
 /**
+ * 日付を正規化してYYYY-MM-DD形式の文字列に変換
+ * タイムゾーンの問題を回避するための堅牢な処理
+ */
+function normalizeDate(dateValue) {
+  if (!dateValue) return '';
+
+  // Date オブジェクトの場合
+  if (dateValue instanceof Date) {
+    return Utilities.formatDate(dateValue, 'Asia/Tokyo', 'yyyy-MM-dd');
+  }
+
+  // 文字列の場合
+  if (typeof dateValue === 'string') {
+    // アポストロフィを除去
+    let str = dateValue.startsWith("'") ? dateValue.substring(1) : dateValue;
+
+    // ISO形式 (例: 2024-12-21T15:00:00.000Z) の場合
+    if (str.includes('T')) {
+      // ISO文字列をパースしてJSTで日付を取得
+      const date = new Date(str);
+      if (!isNaN(date.getTime())) {
+        return Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy-MM-dd');
+      }
+      // パース失敗時はTより前を使用
+      str = str.split('T')[0];
+    }
+
+    // YYYY-MM-DD形式かチェック
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      return str;
+    }
+
+    // 1899/1900年の無効な日付を除外
+    if (str.startsWith('1899') || str.startsWith('1900')) {
+      return '';
+    }
+
+    return str;
+  }
+
+  // 数値の場合（Excelシリアル値）
+  if (typeof dateValue === 'number') {
+    // Excelシリアル値をDateに変換
+    // Excelの基準日は1899-12-30
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000);
+    return Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy-MM-dd');
+  }
+
+  return String(dateValue);
+}
+
+/**
  * シフト提出シートを取得または作成
  */
 function getShiftSheet() {
@@ -194,12 +247,15 @@ function handleSubmitShifts(submissions) {
     const id = sub.id || Utilities.getUuid();
     const slot = SHIFT_SLOTS[sub.slotId] || { label: sub.slotLabel, start: sub.startTime, end: sub.endTime };
 
+    // 日付を正規化（YYYY-MM-DD形式を保証）
+    let dateStr = normalizeDate(sub.date);
+
     sheet.appendRow([
       String(id),
       String(sub.staffId),
       String(sub.staffName),
       String(sub.weekKey),
-      String(sub.date),  // YYYY-MM-DD形式の文字列
+      "'" + dateStr,  // アポストロフィでGoogle Sheetsの自動変換を防ぐ
       String(sub.slotId),
       String(slot.label),
       String(slot.start),
@@ -350,20 +406,8 @@ function handleGetShifts(params) {
 
   const rows = data.slice(1);
   let shifts = rows.map(row => {
-    // 日付をYYYY-MM-DD形式の文字列に変換
-    let dateValue = row[4];
-    if (dateValue instanceof Date) {
-      dateValue = Utilities.formatDate(dateValue, 'Asia/Tokyo', 'yyyy-MM-dd');
-    } else if (typeof dateValue === 'string') {
-      // アポストロフィで始まる場合は除去
-      if (dateValue.startsWith("'")) {
-        dateValue = dateValue.substring(1);
-      }
-      // ISO形式の場合
-      if (dateValue.includes('T')) {
-        dateValue = dateValue.split('T')[0];
-      }
-    }
+    // 日付を正規化（normalizeDate関数を使用）
+    const dateValue = normalizeDate(row[4]);
 
     // staffIdも文字列に変換（数値として読み込まれる場合がある）
     let staffIdValue = row[1];
@@ -371,16 +415,51 @@ function handleGetShifts(params) {
       staffIdValue = String(staffIdValue);
     }
 
+    // 時刻の正規化（ISO形式の場合はHH:MM形式に変換）
+    let startTime = row[7];
+    let endTime = row[8];
+
+    // 時刻がDateオブジェクトの場合
+    if (startTime instanceof Date) {
+      startTime = Utilities.formatDate(startTime, 'Asia/Tokyo', 'HH:mm');
+    } else if (typeof startTime === 'string' && startTime.includes('T')) {
+      const date = new Date(startTime);
+      if (!isNaN(date.getTime())) {
+        startTime = Utilities.formatDate(date, 'Asia/Tokyo', 'HH:mm');
+      }
+    }
+
+    if (endTime instanceof Date) {
+      endTime = Utilities.formatDate(endTime, 'Asia/Tokyo', 'HH:mm');
+    } else if (typeof endTime === 'string' && endTime.includes('T')) {
+      const date = new Date(endTime);
+      if (!isNaN(date.getTime())) {
+        endTime = Utilities.formatDate(date, 'Asia/Tokyo', 'HH:mm');
+      }
+    }
+
+    // slotIdからslotLabel, startTime, endTimeを補完
+    const slotId = String(row[5] || '');
+    const slot = SHIFT_SLOTS[slotId];
+    if (slot) {
+      if (!startTime || startTime.includes('1899') || startTime.includes('1900')) {
+        startTime = slot.start;
+      }
+      if (!endTime || endTime.includes('1899') || endTime.includes('1900')) {
+        endTime = slot.end;
+      }
+    }
+
     return {
       id: String(row[0] || ''),
       staffId: String(staffIdValue || ''),
       staffName: String(row[2] || ''),
       weekKey: String(row[3] || ''),
-      date: String(dateValue || ''),
-      slotId: String(row[5] || ''),
-      slotLabel: String(row[6] || ''),
-      startTime: String(row[7] || ''),
-      endTime: String(row[8] || ''),
+      date: dateValue,
+      slotId: slotId,
+      slotLabel: String(row[6] || slot?.label || ''),
+      startTime: String(startTime || ''),
+      endTime: String(endTime || ''),
       createdAt: String(row[9] || '')
     };
   });

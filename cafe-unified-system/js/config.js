@@ -18,7 +18,7 @@ const CONFIG = {
     ENV: 'development',
 
     // デモモード（trueの場合、常に本日を営業日として扱う）
-    DEMO_MODE: true,
+    DEMO_MODE: false,
 
     // 管理画面パスワード
     ADMIN_PASSWORD: 'admin123',
@@ -31,8 +31,28 @@ const CONFIG = {
 
     // 営業期間
     OPERATION_PERIOD: {
-        start: '2026-01-15',
+        // プレオープン期間
+        preopen: {
+            start: '2026-01-14',  // レセプション
+            end: '2026-01-30'
+        },
+        // グランドオープン期間
+        grandopen: {
+            start: '2026-04-06',
+            end: '2026-04-30'  // 仮の終了日（必要に応じて延長）
+        },
+        // 現在のアクティブ期間（プレオープンまたはグランドオープン）
+        start: '2026-01-14',
         end: '2026-01-30'
+    },
+
+    // 特別日（レセプション等）
+    SPECIAL_DATES: {
+        '2026-01-14': {
+            type: 'reception',
+            label: 'レセプション',
+            note: '午後のみ営業'
+        }
     },
 
     // 営業時間情報
@@ -88,36 +108,45 @@ const CONFIG = {
     // 営業日・営業枠設定
     // =======================================================================
 
-    // 営業日リスト
+    // 営業日リスト（プレオープン期間: 2026年1月）
+    // 火・金 = 午前+午後、月・水・木 = 午後のみ、土日 = 休み
     OPERATION_DATES: [
-        { date: '2026-01-15', weekday: 4, hasMorning: false, hasAfternoon: true },
+        // 1/14週（レセプション + プレオープン開始）
+        { date: '2026-01-14', weekday: 3, hasMorning: false, hasAfternoon: true, isSpecial: true, label: 'レセプション' },
+        { date: '2026-01-15', weekday: 4, hasMorning: false, hasAfternoon: true, label: 'プレオープン初日' },
         { date: '2026-01-16', weekday: 5, hasMorning: true, hasAfternoon: true },
+        // 1/19週
         { date: '2026-01-19', weekday: 1, hasMorning: false, hasAfternoon: true },
         { date: '2026-01-20', weekday: 2, hasMorning: true, hasAfternoon: true },
         { date: '2026-01-21', weekday: 3, hasMorning: false, hasAfternoon: true },
         { date: '2026-01-22', weekday: 4, hasMorning: false, hasAfternoon: true },
         { date: '2026-01-23', weekday: 5, hasMorning: true, hasAfternoon: true },
+        // 1/26週
         { date: '2026-01-26', weekday: 1, hasMorning: false, hasAfternoon: true },
         { date: '2026-01-27', weekday: 2, hasMorning: true, hasAfternoon: true },
         { date: '2026-01-28', weekday: 3, hasMorning: false, hasAfternoon: true },
         { date: '2026-01-29', weekday: 4, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-30', weekday: 5, hasMorning: true, hasAfternoon: true }
+        { date: '2026-01-30', weekday: 5, hasMorning: true, hasAfternoon: true, label: 'プレオープン最終日' }
     ],
 
     // 日付ごとの営業枠設定（DEMO_MODE=false時に使用）
     DATE_SLOTS: {
-        '2026-01-15': ['PM_A', 'PM_B'],
-        '2026-01-16': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],
-        '2026-01-19': ['PM_A', 'PM_B'],
-        '2026-01-20': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],
-        '2026-01-21': ['PM_A', 'PM_B'],
-        '2026-01-22': ['PM_A', 'PM_B'],
-        '2026-01-23': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],
-        '2026-01-26': ['PM_A', 'PM_B'],
-        '2026-01-27': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],
-        '2026-01-28': ['PM_A', 'PM_B'],
-        '2026-01-29': ['PM_A', 'PM_B'],
-        '2026-01-30': ['AM_A', 'AM_B', 'PM_A', 'PM_B']
+        // 1/14週
+        '2026-01-14': ['PM_A', 'PM_B'],  // レセプション（午後のみ）
+        '2026-01-15': ['PM_A', 'PM_B'],  // 木曜（午後のみ）
+        '2026-01-16': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 金曜（午前+午後）
+        // 1/19週
+        '2026-01-19': ['PM_A', 'PM_B'],  // 月曜
+        '2026-01-20': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 火曜
+        '2026-01-21': ['PM_A', 'PM_B'],  // 水曜
+        '2026-01-22': ['PM_A', 'PM_B'],  // 木曜
+        '2026-01-23': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 金曜
+        // 1/26週
+        '2026-01-26': ['PM_A', 'PM_B'],  // 月曜
+        '2026-01-27': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 火曜
+        '2026-01-28': ['PM_A', 'PM_B'],  // 水曜
+        '2026-01-29': ['PM_A', 'PM_B'],  // 木曜
+        '2026-01-30': ['AM_A', 'AM_B', 'PM_A', 'PM_B']   // 金曜（最終日）
     },
 
     // =======================================================================
@@ -129,16 +158,19 @@ const CONFIG = {
         {
             weekKey: '2026-01-12',
             label: '1/12週',
-            dates: ['2026-01-15', '2026-01-16']
+            description: 'レセプション〜プレオープン開始',
+            dates: ['2026-01-14', '2026-01-15', '2026-01-16']
         },
         {
             weekKey: '2026-01-19',
             label: '1/19週',
+            description: 'プレオープン第2週',
             dates: ['2026-01-19', '2026-01-20', '2026-01-21', '2026-01-22', '2026-01-23']
         },
         {
             weekKey: '2026-01-26',
             label: '1/26週',
+            description: 'プレオープン最終週',
             dates: ['2026-01-26', '2026-01-27', '2026-01-28', '2026-01-29', '2026-01-30']
         }
     ],
@@ -264,9 +296,50 @@ function formatDateStr(date) {
 
 /**
  * YYYY-MM-DD形式の文字列からDateオブジェクトを作成
+ * タイムゾーンの問題を避けるため、ローカル時間の午前0時を使用
  */
 function parseDateStr(dateStr) {
-    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!dateStr || typeof dateStr !== 'string') {
+        console.warn('[parseDateStr] 無効な日付文字列:', dateStr);
+        return new Date(NaN);
+    }
+
+    // アポストロフィを除去
+    if (dateStr.startsWith("'")) {
+        dateStr = dateStr.substring(1);
+    }
+
+    // ISO形式の場合は正しくパースしてローカル日付を取得
+    if (dateStr.includes('T')) {
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+            // ローカルタイムゾーンでの日付のみを取得して再作成
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        }
+    }
+
+    // YYYY-MM-DD形式
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) {
+        console.warn('[parseDateStr] 不正な形式:', dateStr);
+        return new Date(NaN);
+    }
+
+    const [year, month, day] = parts.map(Number);
+
+    // 値の検証
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+        console.warn('[parseDateStr] 数値変換エラー:', dateStr);
+        return new Date(NaN);
+    }
+
+    // 1899/1900年の無効な日付をチェック
+    if (year < 1901) {
+        console.warn('[parseDateStr] 無効な年:', year);
+        return new Date(NaN);
+    }
+
+    // ローカルタイムゾーンの午前0時でDateを作成
     return new Date(year, month - 1, day);
 }
 
@@ -280,9 +353,21 @@ function getWeekdayName(weekday) {
 
 /**
  * 日付を表示用にフォーマット（例: 1/15（木））
+ * 無効な日付の場合は空文字列を返す
  */
 function formatDateDisplay(dateStr) {
+    if (!dateStr) {
+        return '';
+    }
+
     const d = parseDateStr(dateStr);
+
+    // 無効な日付の場合
+    if (isNaN(d.getTime())) {
+        console.warn('[formatDateDisplay] 無効な日付:', dateStr);
+        return '';
+    }
+
     const month = d.getMonth() + 1;
     const day = d.getDate();
     const weekday = getWeekdayName(d.getDay());
@@ -291,21 +376,67 @@ function formatDateDisplay(dateStr) {
 
 /**
  * 日付から週キーを取得
+ * DEMO_MODE時は動的に生成された週リストを使用
  */
 function getWeekKey(dateStr) {
-    for (const week of CONFIG.WEEKS) {
+    // DEMO_MODEの場合は動的に週リストを取得
+    const weeks = getWeeks();
+
+    for (const week of weeks) {
         if (week.dates.includes(dateStr)) {
             return week.weekKey;
         }
     }
+
+    // 見つからない場合は、日付から月曜日を計算して週キーを生成
+    if (dateStr && CONFIG.DEMO_MODE) {
+        const date = parseDateStr(dateStr);
+        if (!isNaN(date.getTime())) {
+            const dayOfWeek = date.getDay();
+            const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            const monday = new Date(date);
+            monday.setDate(date.getDate() + diff);
+            return formatDateStr(monday);
+        }
+    }
+
     return null;
 }
 
 /**
  * 週キーから週情報を取得
+ * DEMO_MODE時は動的に生成された週リストを使用
  */
 function getWeekInfo(weekKey) {
-    return CONFIG.WEEKS.find(w => w.weekKey === weekKey) || null;
+    if (!weekKey) return null;
+
+    // DEMO_MODEの場合は動的に週リストを取得
+    const weeks = getWeeks();
+    const found = weeks.find(w => w.weekKey === weekKey);
+
+    if (found) return found;
+
+    // 見つからない場合は、weekKeyから週情報を生成
+    if (CONFIG.DEMO_MODE && weekKey) {
+        const monday = parseDateStr(weekKey);
+        if (!isNaN(monday.getTime())) {
+            const dates = [];
+            for (let d = 0; d < 5; d++) {
+                const date = new Date(monday);
+                date.setDate(monday.getDate() + d);
+                dates.push(formatDateStr(date));
+            }
+            const month = monday.getMonth() + 1;
+            const day = monday.getDate();
+            return {
+                weekKey: weekKey,
+                label: `${month}/${day}週`,
+                dates: dates
+            };
+        }
+    }
+
+    return null;
 }
 
 /**
