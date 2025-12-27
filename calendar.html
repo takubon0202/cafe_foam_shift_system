@@ -45,6 +45,7 @@
 
             <!-- フィルター -->
             <section class="card">
+                <p class="filter-hint">自分の名前を選ぶと、自分のシフトが強調表示され、キャンセルもできます</p>
                 <div class="filter-row">
                     <div class="form-group form-group--inline">
                         <label for="filterStaff" class="form-label">スタッフ</label>
@@ -56,26 +57,29 @@
             </section>
 
             <!-- 凡例 -->
-            <section class="legend">
-                <div class="legend__item">
-                    <span class="legend__dot legend__dot--mine"></span>
-                    <span>自分のシフト</span>
-                </div>
-                <div class="legend__item">
-                    <span class="legend__dot legend__dot--full"></span>
-                    <span>人員充足</span>
-                </div>
-                <div class="legend__item">
-                    <span class="legend__dot legend__dot--available"></span>
-                    <span>一部申請あり</span>
-                </div>
-                <div class="legend__item">
-                    <span class="legend__dot legend__dot--shortage"></span>
-                    <span>人員不足</span>
-                </div>
-                <div class="legend__item">
-                    <span class="legend__dot legend__dot--closed"></span>
-                    <span>営業なし</span>
+            <section class="legend-section">
+                <p class="legend-note">日付の下の数字は「申請済み/必要人数」を表しています</p>
+                <div class="legend">
+                    <div class="legend__item">
+                        <span class="legend__dot legend__dot--mine"></span>
+                        <span>自分のシフト</span>
+                    </div>
+                    <div class="legend__item">
+                        <span class="legend__dot legend__dot--full"></span>
+                        <span>スタッフ足りてます</span>
+                    </div>
+                    <div class="legend__item">
+                        <span class="legend__dot legend__dot--available"></span>
+                        <span>募集中（あと少し）</span>
+                    </div>
+                    <div class="legend__item">
+                        <span class="legend__dot legend__dot--shortage"></span>
+                        <span>スタッフ募集中</span>
+                    </div>
+                    <div class="legend__item">
+                        <span class="legend__dot legend__dot--closed"></span>
+                        <span>お休み</span>
+                    </div>
                 </div>
             </section>
 

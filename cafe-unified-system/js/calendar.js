@@ -54,6 +54,7 @@
             populateStaffFilter();
             renderPeriodInfo();
             setupEventListeners();
+            updateTodayButton();
             await loadShiftData();
         } catch (error) {
             console.error('カレンダー初期化エラー:', error);
@@ -177,6 +178,20 @@
             const year = currentDisplayMonth.getFullYear();
             const month = currentDisplayMonth.getMonth() + 1;
             elements.monthTitle.textContent = `${year}年${month}月`;
+        }
+    }
+
+    /**
+     * 今日ボタンのテキストを更新（今日の日付を表示）
+     */
+    function updateTodayButton() {
+        if (elements.btnToday) {
+            const today = new Date();
+            const month = today.getMonth() + 1;
+            const day = today.getDate();
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            const weekday = weekdays[today.getDay()];
+            elements.btnToday.textContent = `今日 ${month}/${day}(${weekday})`;
         }
     }
 
@@ -482,13 +497,27 @@
             if (!isAvailable) {
                 html += `<span class="day-detail__empty">この時間帯は営業していません</span>`;
             } else if (slotShifts.length > 0) {
+                const selectedStaffId = elements.filterStaff.value;
                 slotShifts.forEach(shift => {
-                    html += `<span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>`;
+                    const isMine = selectedStaffId && String(shift.staffId) === selectedStaffId;
+                    if (isMine) {
+                        html += `
+                            <div class="day-detail__staff-row day-detail__staff-row--mine">
+                                <span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>
+                                <button type="button" class="btn btn--small btn--danger"
+                                    onclick="cancelShiftFromCalendar('${shift.id}', '${Utils.escapeHtml(shift.staffName)}', '${dateStr}', '${slotId}')">
+                                    キャンセル
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        html += `<span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>`;
+                    }
                 });
                 if (count < required) {
                     html += `<span class="day-detail__need">あと${required - count}名必要</span>`;
                 } else {
-                    html += `<span class="day-detail__sufficient">人員充足</span>`;
+                    html += `<span class="day-detail__sufficient">スタッフ足りてます</span>`;
                 }
             } else {
                 html += `<span class="day-detail__empty">申請者なし（${required}名必要）</span>`;
@@ -545,6 +574,57 @@
             }
         }
     }
+
+    /**
+     * カレンダーからシフトをキャンセル
+     */
+    async function cancelShiftFromCalendar(shiftId, staffName, dateStr, slotId) {
+        const slot = CONFIG.SHIFT_SLOTS[slotId];
+        const slotLabel = slot ? slot.label : slotId;
+        const date = parseDateStr(dateStr);
+        const dateLabel = `${date.getMonth() + 1}/${date.getDate()}`;
+
+        if (!confirm(`${dateLabel} ${slotLabel}のシフトをキャンセルしますか？\n\n※一度キャンセルすると、再度提出が必要です。`)) {
+            return;
+        }
+
+        try {
+            Utils.showLoading(true, 'キャンセル中...');
+
+            // GASに削除リクエスト
+            if (isConfigValid()) {
+                try {
+                    const response = await Utils.apiRequest('deleteShift', { shiftId });
+                    if (!response.success) {
+                        throw new Error(response.message || 'キャンセルに失敗しました');
+                    }
+                } catch (error) {
+                    console.error('GASでのキャンセルに失敗:', error);
+                    throw error;
+                }
+            }
+
+            // ローカルストレージからも削除
+            allShiftRequests = allShiftRequests.filter(s => s.id !== shiftId);
+            Utils.saveToStorage(CONFIG.STORAGE_KEYS.SHIFTS, allShiftRequests);
+
+            Utils.showMessage('シフトをキャンセルしました', 'success');
+
+            // 画面を更新
+            renderCalendar();
+            updateStats();
+            showDayDetail(dateStr);
+
+        } catch (error) {
+            console.error('キャンセルエラー:', error);
+            Utils.showMessage('キャンセルに失敗しました: ' + error.message, 'error');
+        } finally {
+            Utils.showLoading(false);
+        }
+    }
+
+    // グローバルスコープに公開（onclick用）
+    window.cancelShiftFromCalendar = cancelShiftFromCalendar;
 
     // 初期化
     document.addEventListener('DOMContentLoaded', init);

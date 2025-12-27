@@ -24,18 +24,43 @@
         </nav>
 
         <main>
-            <!-- 注意事項 -->
-            <section class="card card--info">
-                <p class="info-text">各週で <strong>1枠のみ</strong> 選択できます（週1回・90分）</p>
+            <!-- 初めての方へ（オンボーディング） -->
+            <section class="card card--guide" id="onboardingSection">
+                <div class="card__header-row">
+                    <h2 class="card__title">シフト提出の流れ</h2>
+                    <button type="button" class="btn--close" id="btnCloseOnboarding" aria-label="閉じる">×</button>
+                </div>
+                <ol class="guide-steps">
+                    <li class="guide-step">
+                        <span class="guide-step__num">1</span>
+                        <span class="guide-step__text">下の一覧から<strong>自分の名前</strong>を選択</span>
+                    </li>
+                    <li class="guide-step">
+                        <span class="guide-step__num">2</span>
+                        <span class="guide-step__text">各週で<strong>1つだけ</strong>シフト枠を選ぶ</span>
+                    </li>
+                    <li class="guide-step">
+                        <span class="guide-step__num">3</span>
+                        <span class="guide-step__text">「シフトを提出する」ボタンを押す</span>
+                    </li>
+                </ol>
+                <p class="guide-note">1週間に1枠（90分）だけ働けます。午前A/Bと午後A/Bは開始時間が違うだけで、どちらを選んでもOKです。</p>
             </section>
 
             <!-- メンバー選択 -->
             <section class="card">
-                <h2 class="card__title">メンバー選択</h2>
+                <h2 class="card__title">1. 自分の名前を選択</h2>
                 <div class="form-group">
-                    <label for="memberSelect" class="form-label">学籍番号・氏名</label>
+                    <label for="memberSearch" class="form-label">名前で検索</label>
+                    <div class="search-input-wrapper">
+                        <input type="text" id="memberSearch" class="form-input" placeholder="名前を入力（ひらがな・漢字OK）">
+                        <button type="button" id="btnClearSearch" class="btn--clear" aria-label="検索をクリア" style="display: none;">×</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="memberSelect" class="form-label">スタッフ一覧</label>
                     <select id="memberSelect" class="form-select">
-                        <option value="">-- 選択してください --</option>
+                        <option value="">-- 自分の名前を選んでください --</option>
                     </select>
                 </div>
                 <p class="selected-name" id="selectedName"></p>

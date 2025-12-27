@@ -8,13 +8,17 @@
 
     const elements = {
         memberSelect: document.getElementById('memberSelect'),
+        memberSearch: document.getElementById('memberSearch'),
         selectedName: document.getElementById('selectedName'),
         shiftSection: document.getElementById('shiftSection'),
         submitSection: document.getElementById('submitSection'),
         selectionSummary: document.getElementById('selectionSummary'),
         btnSubmit: document.getElementById('btnSubmit'),
         myShiftsSection: document.getElementById('myShiftsSection'),
-        myShiftsList: document.getElementById('myShiftsList')
+        myShiftsList: document.getElementById('myShiftsList'),
+        onboardingSection: document.getElementById('onboardingSection'),
+        btnCloseOnboarding: document.getElementById('btnCloseOnboarding'),
+        btnClearSearch: document.getElementById('btnClearSearch')
     };
 
     // 週ごとの選択状態
@@ -34,11 +38,33 @@
 
         populateMemberSelect();
         setupEventListeners();
+        initOnboarding();
 
         // シフトデータを読み込み
         await loadAllShifts();
 
         restoreLastSelection();
+    }
+
+    /**
+     * オンボーディングの初期化
+     */
+    function initOnboarding() {
+        // LocalStorageからオンボーディング表示状態を確認
+        const isHidden = Utils.getFromStorage('onboarding_hidden');
+        if (isHidden && elements.onboardingSection) {
+            elements.onboardingSection.style.display = 'none';
+        }
+
+        // 閉じるボタンのイベント
+        if (elements.btnCloseOnboarding) {
+            elements.btnCloseOnboarding.addEventListener('click', () => {
+                if (elements.onboardingSection) {
+                    elements.onboardingSection.style.display = 'none';
+                    Utils.saveToStorage('onboarding_hidden', true);
+                }
+            });
+        }
     }
 
     /**
@@ -96,6 +122,68 @@
     function setupEventListeners() {
         elements.memberSelect.addEventListener('change', handleMemberChange);
         elements.btnSubmit.addEventListener('click', handleSubmit);
+
+        // 検索フィルター機能
+        if (elements.memberSearch) {
+            elements.memberSearch.addEventListener('input', handleMemberSearch);
+        }
+
+        // 検索クリアボタン
+        if (elements.btnClearSearch) {
+            elements.btnClearSearch.addEventListener('click', handleClearSearch);
+        }
+    }
+
+    /**
+     * 検索をクリア
+     */
+    function handleClearSearch() {
+        if (elements.memberSearch) {
+            elements.memberSearch.value = '';
+            // 全オプションを表示
+            const options = elements.memberSelect.querySelectorAll('option');
+            options.forEach(option => option.style.display = '');
+            // クリアボタンを非表示
+            if (elements.btnClearSearch) {
+                elements.btnClearSearch.style.display = 'none';
+            }
+            // 検索ボックスにフォーカス
+            elements.memberSearch.focus();
+        }
+    }
+
+    /**
+     * メンバー検索フィルター
+     */
+    function handleMemberSearch(e) {
+        const searchTerm = e.target.value.toLowerCase().trim();
+        const options = elements.memberSelect.querySelectorAll('option');
+
+        // クリアボタンの表示/非表示
+        if (elements.btnClearSearch) {
+            elements.btnClearSearch.style.display = e.target.value.length > 0 ? 'flex' : 'none';
+        }
+
+        options.forEach(option => {
+            if (option.value === '') {
+                // デフォルトオプションは常に表示
+                option.style.display = '';
+                return;
+            }
+            const text = option.textContent.toLowerCase();
+            if (searchTerm === '' || text.includes(searchTerm)) {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        });
+
+        // 検索結果が1件のみの場合は自動選択
+        const visibleOptions = Array.from(options).filter(o => o.value && o.style.display !== 'none');
+        if (visibleOptions.length === 1 && searchTerm.length >= 2) {
+            elements.memberSelect.value = visibleOptions[0].value;
+            handleMemberChange();
+        }
     }
 
     /**
