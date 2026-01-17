@@ -254,37 +254,38 @@
     }
 
     /**
-     * 今日の打刻記録をロード
+     * 今日の打刻記録をロード（高速化版）
+     * ローカルデータを先に表示してからGASを非同期で取得
      */
     async function loadTodayRecords(staffId) {
         const today = Utils.formatDate();
 
+        // まずローカルデータを即座に表示（UX改善）
+        const localRecords = Utils.getFromStorage(CONFIG.STORAGE_KEYS.CLOCK_RECORDS) || [];
+        todayRecords = localRecords.filter(r => r.date === today);
+        renderHistory();
+        updateStatusDisplay();
+
+        // GASが設定されていない場合はここで終了
         if (!isConfigValid()) {
-            // ローカルデータを使用
-            const localRecords = Utils.getFromStorage(CONFIG.STORAGE_KEYS.CLOCK_RECORDS) || [];
-            todayRecords = localRecords.filter(r => r.date === today);
-            renderHistory();
-            updateStatusDisplay();
             return;
         }
 
+        // GASからバックグラウンドでデータを取得（ローディング表示なし）
         try {
-            Utils.showLoading(true, '記録を取得中...');
             const response = await Utils.apiRequest('getRecords', { date: today });
             if (response.success || response.ok) {
-                todayRecords = response.records || [];
-                renderHistory();
-                updateStatusDisplay();
+                const gasRecords = response.records || [];
+                // GASのデータがある場合は更新
+                if (gasRecords.length > 0) {
+                    todayRecords = gasRecords;
+                    renderHistory();
+                    updateStatusDisplay();
+                }
             }
         } catch (error) {
-            console.error('記録取得エラー:', error);
-            // ローカルデータにフォールバック
-            const localRecords = Utils.getFromStorage(CONFIG.STORAGE_KEYS.CLOCK_RECORDS) || [];
-            todayRecords = localRecords.filter(r => r.date === today);
-            renderHistory();
-            updateStatusDisplay();
-        } finally {
-            Utils.showLoading(false);
+            // GASエラーは無視（ローカルデータで動作継続）
+            console.warn('GAS記録取得スキップ:', error.message);
         }
     }
 
