@@ -17,12 +17,20 @@
         statusDisplay: document.getElementById('statusDisplay'),
         btnClockIn: document.getElementById('btnClockIn'),
         btnClockOut: document.getElementById('btnClockOut'),
-        historyList: document.getElementById('historyList')
+        historyList: document.getElementById('historyList'),
+        // 研修テストモード用
+        testModeToggle: document.getElementById('testModeToggle'),
+        testModePanel: document.getElementById('testModePanel'),
+        btnTestClockIn: document.getElementById('btnTestClockIn'),
+        btnTestClockOut: document.getElementById('btnTestClockOut'),
+        testHistoryList: document.getElementById('testHistoryList'),
+        btnClearTestHistory: document.getElementById('btnClearTestHistory')
     };
 
     let selectedSlot = null;
     let todayRecords = [];
     let myShifts = [];
+    let testRecords = [];
 
     /**
      * 初期化
@@ -34,6 +42,7 @@
         renderSlotButtons();
         setupEventListeners();
         loadLastStaff();
+        initTestMode();
     }
 
     /**
@@ -489,6 +498,172 @@
         }).join('') + '</ul>';
 
         elements.historyList.innerHTML = html;
+    }
+
+    // ========== 研修打刻テストモード ==========
+
+    /**
+     * テストモードの初期化
+     */
+    function initTestMode() {
+        if (!elements.testModeToggle) return;
+
+        // 保存されたテスト記録を読み込み
+        testRecords = Utils.getFromStorage('cafe_test_clock_records') || [];
+        renderTestHistory();
+
+        // トグルスイッチのイベント
+        elements.testModeToggle.addEventListener('change', handleTestModeToggle);
+
+        // テスト打刻ボタンのイベント
+        if (elements.btnTestClockIn) {
+            elements.btnTestClockIn.addEventListener('click', () => handleTestPunch('in'));
+        }
+        if (elements.btnTestClockOut) {
+            elements.btnTestClockOut.addEventListener('click', () => handleTestPunch('out'));
+        }
+        if (elements.btnClearTestHistory) {
+            elements.btnClearTestHistory.addEventListener('click', handleClearTestHistory);
+        }
+    }
+
+    /**
+     * テストモードの切り替え
+     */
+    function handleTestModeToggle() {
+        const isEnabled = elements.testModeToggle.checked;
+        elements.testModePanel.style.display = isEnabled ? 'block' : 'none';
+
+        if (isEnabled) {
+            Utils.showMessage('研修テストモードが有効になりました', 'success');
+        }
+    }
+
+    /**
+     * テスト打刻処理
+     */
+    function handleTestPunch(clockType) {
+        const staffId = elements.staffSelect.value;
+        const staffName = getStaffName(staffId);
+
+        if (!staffId) {
+            Utils.showMessage('スタッフを選択してください', 'error');
+            return;
+        }
+
+        // 二重打刻チェック
+        const lastTestRecord = testRecords.filter(r => r.staffId === staffId)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+        if (clockType === 'in' && lastTestRecord?.clockType === 'in') {
+            Utils.showMessage('テスト: すでに出勤済みです', 'error');
+            return;
+        }
+        if (clockType === 'out' && lastTestRecord?.clockType === 'out') {
+            Utils.showMessage('テスト: すでに退勤済みです', 'error');
+            return;
+        }
+        if (clockType === 'out' && !lastTestRecord) {
+            Utils.showMessage('テスト: 先にテスト出勤をしてください', 'error');
+            return;
+        }
+
+        const now = Utils.getJSTDate();
+        const time = Utils.formatTimeShort(now);
+
+        // テスト用のシフト枠情報（現在時刻から30分間）
+        const testSlotInfo = {
+            id: 'test',
+            label: 'テスト枠',
+            start: time,
+            end: addMinutes(time, 30)
+        };
+
+        // テスト用の遅刻・早退判定（常に正常）
+        const status = 'normal';
+
+        const record = {
+            id: Utils.generateId(),
+            date: Utils.formatDate(now),
+            staffId: staffId,
+            staffName: staffName,
+            slotId: 'test',
+            slotLabel: 'テスト枠',
+            clockType: clockType,
+            time: time,
+            status: status,
+            timestamp: now.toISOString(),
+            isTest: true
+        };
+
+        testRecords.push(record);
+        Utils.saveToStorage('cafe_test_clock_records', testRecords);
+        renderTestHistory();
+
+        const message = clockType === 'in'
+            ? `テスト出勤を記録しました（${time}）`
+            : `テスト退勤を記録しました（${time}）`;
+
+        Utils.showMessage(message, 'success');
+    }
+
+    /**
+     * 時刻に分を追加
+     */
+    function addMinutes(timeStr, minutes) {
+        const [h, m] = timeStr.split(':').map(Number);
+        const totalMinutes = h * 60 + m + minutes;
+        const newH = Math.floor(totalMinutes / 60) % 24;
+        const newM = totalMinutes % 60;
+        return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+    }
+
+    /**
+     * テスト履歴をレンダリング
+     */
+    function renderTestHistory() {
+        if (!elements.testHistoryList) return;
+
+        const staffId = elements.staffSelect.value;
+        const records = testRecords
+            .filter(r => !staffId || r.staffId === staffId)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        if (records.length === 0) {
+            elements.testHistoryList.innerHTML = '<p class="no-history">テスト打刻履歴はありません</p>';
+            return;
+        }
+
+        const html = '<ul class="test-history-list">' + records.map(record => {
+            const typeClass = record.clockType === 'in' ? 'clock-in' : 'clock-out';
+            const typeLabel = record.clockType === 'in' ? 'テスト出勤' : 'テスト退勤';
+
+            return `
+                <li class="test-history-item test-history-item--${typeClass}">
+                    <div>
+                        <span class="test-history-type">${typeLabel}</span>
+                        <small style="color: var(--color-text-muted); margin-left: 0.5rem;">${record.staffName}</small>
+                    </div>
+                    <span class="test-history-time">${record.time}</span>
+                </li>
+            `;
+        }).join('') + '</ul>';
+
+        elements.testHistoryList.innerHTML = html;
+    }
+
+    /**
+     * テスト履歴をクリア
+     */
+    function handleClearTestHistory() {
+        if (!confirm('テスト打刻履歴をすべて削除しますか？')) {
+            return;
+        }
+
+        testRecords = [];
+        Utils.saveToStorage('cafe_test_clock_records', testRecords);
+        renderTestHistory();
+        Utils.showMessage('テスト履歴をクリアしました', 'success');
     }
 
     // 初期化

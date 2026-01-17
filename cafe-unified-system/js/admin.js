@@ -41,7 +41,6 @@
         newShiftStaff: document.getElementById('newShiftStaff'),
         btnAddShiftSlot: document.getElementById('btnAddShiftSlot'),
         currentShiftConfig: document.getElementById('currentShiftConfig'),
-        btnResetShiftConfig: document.getElementById('btnResetShiftConfig'),
         // スタッフ
         staffList: document.getElementById('staffList'),
         staffStatsBody: document.getElementById('staffStatsBody'),
@@ -113,9 +112,6 @@
         // シフト設定
         if (elements.btnAddShiftSlot) {
             elements.btnAddShiftSlot.addEventListener('click', handleAddShiftSlot);
-        }
-        if (elements.btnResetShiftConfig) {
-            elements.btnResetShiftConfig.addEventListener('click', handleResetShiftConfig);
         }
 
         // データ管理
@@ -749,17 +745,6 @@
             // フォームをリセット
             if (elements.newShiftLabel) elements.newShiftLabel.value = '';
         }
-    }
-
-    function handleResetShiftConfig() {
-        if (!confirm('カスタム設定をリセットしますか？デフォルトの設定に戻ります。')) {
-            return;
-        }
-
-        localStorage.removeItem('cafe_custom_shift_slots');
-        Utils.showMessage('カスタム設定をリセットしました', 'success');
-        renderCurrentShiftConfig();
-        populateShiftDateSelect();
     }
 
     // ========== スタッフタブ ==========

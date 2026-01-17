@@ -99,6 +99,38 @@
                 <p class="no-history">打刻履歴はありません</p>
             </div>
         </section>
+
+        <!-- 研修打刻テストモード -->
+        <section class="card card--test">
+            <h2 class="card__title">研修打刻テスト</h2>
+            <p class="card__note">営業枠がなくても打刻機能をテストできます。テスト記録は実際の勤怠には含まれません。</p>
+            <div class="test-mode-toggle">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="testModeToggle">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">テストモードを有効にする</span>
+                </label>
+            </div>
+            <div id="testModePanel" style="display: none;">
+                <div class="test-slot-info">
+                    <p class="test-slot-label">テスト枠（現在時刻から30分間）</p>
+                </div>
+                <div class="clock-buttons clock-buttons--test">
+                    <button type="button" id="btnTestClockIn" class="btn btn--clock-in btn--full">
+                        テスト出勤
+                    </button>
+                    <button type="button" id="btnTestClockOut" class="btn btn--clock-out btn--full">
+                        テスト退勤
+                    </button>
+                </div>
+                <div class="test-history" id="testHistoryList">
+                    <p class="no-history">テスト打刻履歴はありません</p>
+                </div>
+                <button type="button" id="btnClearTestHistory" class="btn btn--secondary btn--small" style="margin-top: 1rem;">
+                    テスト履歴をクリア
+                </button>
+            </div>
+        </section>
     </div>
 
     <script src="js/config.js"></script>
