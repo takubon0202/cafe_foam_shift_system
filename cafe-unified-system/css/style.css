@@ -2530,3 +2530,165 @@ body {
     font-family: 'SF Mono', 'Monaco', monospace;
     color: var(--color-text-light);
 }
+
+/* ========================================
+   Import Section - シフト一括インポート
+   ======================================== */
+
+.import-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.import-template__title,
+.import-upload__title,
+.import-preview__title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: var(--spacing-sm);
+}
+
+.import-template .button-group {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+/* File Upload */
+.file-upload {
+    position: relative;
+}
+
+.file-upload__input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.file-upload__label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.file-upload__label:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-bg);
+}
+
+.file-upload__input:focus + .file-upload__label {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.file-upload__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    font-size: var(--font-size-2xl);
+    font-weight: 300;
+    margin-bottom: var(--spacing-sm);
+}
+
+.file-upload__text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-light);
+}
+
+.file-upload__name {
+    margin-top: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.file-upload__name--selected {
+    color: var(--color-primary);
+    font-weight: 500;
+}
+
+/* Import Preview */
+.import-preview {
+    padding: var(--spacing-md);
+    background-color: var(--color-primary-bg);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-primary-light);
+}
+
+.import-preview__content {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.import-preview-table {
+    width: 100%;
+    font-size: var(--font-size-xs);
+    border-collapse: collapse;
+}
+
+.import-preview-table th,
+.import-preview-table td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    text-align: left;
+    border-bottom: 1px solid var(--color-primary-light);
+}
+
+.import-preview-table th {
+    font-weight: 600;
+    background-color: rgba(46, 125, 50, 0.1);
+    position: sticky;
+    top: 0;
+}
+
+.import-preview-table tr:last-child td {
+    border-bottom: none;
+}
+
+.import-preview__summary {
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-primary-light);
+    font-size: var(--font-size-sm);
+    color: var(--color-primary-dark);
+    font-weight: 500;
+}
+
+.import-error {
+    padding: var(--spacing-md);
+    background-color: #FFEBEE;
+    border: 1px solid #FFCDD2;
+    border-radius: var(--radius-md);
+    color: var(--color-error);
+    font-size: var(--font-size-sm);
+}
+
+.import-error__title {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.import-error__list {
+    list-style: disc;
+    padding-left: var(--spacing-lg);
+    margin: 0;
+}
+
+.import-error__list li {
+    margin-bottom: var(--spacing-xs);
+}

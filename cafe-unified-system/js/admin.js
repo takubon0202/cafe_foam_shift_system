@@ -41,6 +41,14 @@
         newShiftStaff: document.getElementById('newShiftStaff'),
         btnAddShiftSlot: document.getElementById('btnAddShiftSlot'),
         currentShiftConfig: document.getElementById('currentShiftConfig'),
+        // インポート機能
+        btnDownloadCsvTemplate: document.getElementById('btnDownloadCsvTemplate'),
+        btnDownloadExcelTemplate: document.getElementById('btnDownloadExcelTemplate'),
+        shiftImportFile: document.getElementById('shiftImportFile'),
+        importFileName: document.getElementById('importFileName'),
+        importPreview: document.getElementById('importPreview'),
+        importPreviewContent: document.getElementById('importPreviewContent'),
+        btnImportShifts: document.getElementById('btnImportShifts'),
         // スタッフ
         staffList: document.getElementById('staffList'),
         staffStatsBody: document.getElementById('staffStatsBody'),
@@ -55,6 +63,7 @@
 
     let allRecords = [];
     let allShiftRequests = [];
+    let pendingImportData = [];
 
     /**
      * 初期化
@@ -112,6 +121,20 @@
         // シフト設定
         if (elements.btnAddShiftSlot) {
             elements.btnAddShiftSlot.addEventListener('click', handleAddShiftSlot);
+        }
+
+        // インポート機能
+        if (elements.btnDownloadCsvTemplate) {
+            elements.btnDownloadCsvTemplate.addEventListener('click', handleDownloadCsvTemplate);
+        }
+        if (elements.btnDownloadExcelTemplate) {
+            elements.btnDownloadExcelTemplate.addEventListener('click', handleDownloadExcelTemplate);
+        }
+        if (elements.shiftImportFile) {
+            elements.shiftImportFile.addEventListener('change', handleFileSelect);
+        }
+        if (elements.btnImportShifts) {
+            elements.btnImportShifts.addEventListener('click', handleImportShifts);
         }
 
         // データ管理
@@ -858,6 +881,564 @@
         elements.adminSection.style.display = 'none';
         elements.authSection.style.display = 'flex';
         elements.adminPassword.value = '';
+    }
+
+    // ========== インポート機能 ==========
+
+    /**
+     * CSVテンプレートをダウンロード
+     */
+    function handleDownloadCsvTemplate() {
+        const headers = ['日付', '枠名', '開始時刻', '終了時刻', '必要人数'];
+        const sampleData = [
+            ['2026-01-20', '枠1', '14:40', '16:10', '3'],
+            ['2026-01-20', '枠2', '16:20', '17:50', '3'],
+            ['2026-01-21', '午前枠', '10:00', '12:00', '2'],
+            ['2026-01-21', '午後枠', '13:00', '15:00', '2']
+        ];
+
+        // BOMを追加してExcelで文字化けしないように
+        const BOM = '\uFEFF';
+        const csvContent = BOM + [
+            '# シフト枠一括登録テンプレート',
+            '# 記入方法:',
+            '#   日付: YYYY-MM-DD形式（例: 2026-01-20）',
+            '#   枠名: 任意の名前（例: 枠1、午前枠）',
+            '#   開始時刻: HH:MM形式（例: 14:40）',
+            '#   終了時刻: HH:MM形式（例: 16:10）',
+            '#   必要人数: 数字（例: 3）',
+            '# 注意: この行と上の行は削除してください（#で始まる行は無視されます）',
+            '',
+            headers.join(','),
+            ...sampleData.map(row => row.join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'シフト枠テンプレート.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        Utils.showMessage('CSVテンプレートをダウンロードしました', 'success');
+    }
+
+    /**
+     * Excelテンプレートをダウンロード
+     */
+    function handleDownloadExcelTemplate() {
+        if (typeof XLSX === 'undefined') {
+            Utils.showMessage('Excelライブラリが読み込まれていません', 'error');
+            return;
+        }
+
+        // データシート
+        const dataHeaders = ['日付', '枠名', '開始時刻', '終了時刻', '必要人数'];
+        const sampleData = [
+            ['2026-01-20', '枠1', '14:40', '16:10', 3],
+            ['2026-01-20', '枠2', '16:20', '17:50', 3],
+            ['2026-01-21', '午前枠', '10:00', '12:00', 2],
+            ['2026-01-21', '午後枠', '13:00', '15:00', 2]
+        ];
+
+        const dataSheet = XLSX.utils.aoa_to_sheet([dataHeaders, ...sampleData]);
+
+        // 列幅を設定
+        dataSheet['!cols'] = [
+            { wch: 12 }, // 日付
+            { wch: 10 }, // 枠名
+            { wch: 10 }, // 開始時刻
+            { wch: 10 }, // 終了時刻
+            { wch: 10 }  // 必要人数
+        ];
+
+        // 記入方法シート
+        const instructions = [
+            ['シフト枠一括登録 - 記入方法'],
+            [''],
+            ['【列の説明】'],
+            ['日付', 'YYYY-MM-DD形式で入力（例: 2026-01-20）'],
+            ['枠名', '任意の名前（例: 枠1、午前枠、臨時枠）'],
+            ['開始時刻', 'HH:MM形式で入力（例: 14:40）'],
+            ['終了時刻', 'HH:MM形式で入力（例: 16:10）'],
+            ['必要人数', '数字で入力（例: 3）'],
+            [''],
+            ['【注意事項】'],
+            ['1. 「シフト枠」シートにデータを入力してください'],
+            ['2. 1行目（ヘッダー行）は削除しないでください'],
+            ['3. 日付は必ずYYYY-MM-DD形式で入力してください'],
+            ['4. 時刻は24時間表記で入力してください'],
+            ['5. 必要人数は1以上の整数を入力してください'],
+            [''],
+            ['【サンプルデータ】'],
+            ['サンプルデータは削除または上書きしてお使いください']
+        ];
+
+        const instructionSheet = XLSX.utils.aoa_to_sheet(instructions);
+        instructionSheet['!cols'] = [{ wch: 15 }, { wch: 50 }];
+
+        // ワークブックを作成
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, dataSheet, 'シフト枠');
+        XLSX.utils.book_append_sheet(wb, instructionSheet, '記入方法');
+
+        // ダウンロード
+        XLSX.writeFile(wb, 'シフト枠テンプレート.xlsx');
+        Utils.showMessage('Excelテンプレートをダウンロードしました', 'success');
+    }
+
+    /**
+     * ファイル選択時の処理
+     */
+    function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) {
+            resetImportState();
+            return;
+        }
+
+        const fileName = file.name;
+        const fileExt = fileName.split('.').pop().toLowerCase();
+
+        if (!['csv', 'xlsx', 'xls'].includes(fileExt)) {
+            Utils.showMessage('CSV または Excel ファイルを選択してください', 'error');
+            resetImportState();
+            return;
+        }
+
+        // ファイル名を表示
+        if (elements.importFileName) {
+            elements.importFileName.textContent = fileName;
+            elements.importFileName.classList.add('file-upload__name--selected');
+        }
+
+        // ファイルを読み込み
+        const reader = new FileReader();
+
+        if (fileExt === 'csv') {
+            reader.onload = (event) => {
+                try {
+                    const csvData = event.target.result;
+                    parseCSV(csvData);
+                } catch (error) {
+                    console.error('CSV解析エラー:', error);
+                    showImportError(['CSVファイルの解析に失敗しました: ' + error.message]);
+                }
+            };
+            reader.readAsText(file, 'UTF-8');
+        } else {
+            reader.onload = (event) => {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    parseExcel(data);
+                } catch (error) {
+                    console.error('Excel解析エラー:', error);
+                    showImportError(['Excelファイルの解析に失敗しました: ' + error.message]);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    }
+
+    /**
+     * CSVデータを解析
+     */
+    function parseCSV(csvData) {
+        const lines = csvData.split(/\r?\n/).filter(line => {
+            const trimmed = line.trim();
+            return trimmed && !trimmed.startsWith('#');
+        });
+
+        if (lines.length < 2) {
+            showImportError(['データが見つかりません。ヘッダー行とデータ行を含めてください。']);
+            return;
+        }
+
+        // ヘッダー行を取得
+        const headers = parseCSVLine(lines[0]);
+
+        // 必須列のインデックスを確認
+        const dateIdx = findColumnIndex(headers, ['日付', 'date']);
+        const labelIdx = findColumnIndex(headers, ['枠名', 'label', '名前']);
+        const startIdx = findColumnIndex(headers, ['開始時刻', '開始', 'start', '開始時間']);
+        const endIdx = findColumnIndex(headers, ['終了時刻', '終了', 'end', '終了時間']);
+        const staffIdx = findColumnIndex(headers, ['必要人数', '人数', 'staff', '必要スタッフ']);
+
+        if (dateIdx === -1 || startIdx === -1 || endIdx === -1) {
+            showImportError(['必須列が見つかりません。「日付」「開始時刻」「終了時刻」列は必須です。']);
+            return;
+        }
+
+        // データ行を解析
+        const data = [];
+        const errors = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const values = parseCSVLine(lines[i]);
+            if (values.length === 0 || values.every(v => !v.trim())) continue;
+
+            const row = {
+                date: values[dateIdx]?.trim() || '',
+                label: values[labelIdx]?.trim() || '',
+                start: values[startIdx]?.trim() || '',
+                end: values[endIdx]?.trim() || '',
+                requiredStaff: parseInt(values[staffIdx]) || 3
+            };
+
+            const rowErrors = validateImportRow(row, i + 1);
+            if (rowErrors.length > 0) {
+                errors.push(...rowErrors);
+            } else {
+                data.push(row);
+            }
+        }
+
+        if (errors.length > 0) {
+            showImportError(errors);
+            return;
+        }
+
+        if (data.length === 0) {
+            showImportError(['有効なデータが見つかりません。']);
+            return;
+        }
+
+        pendingImportData = data;
+        showImportPreview(data);
+    }
+
+    /**
+     * Excelデータを解析
+     */
+    function parseExcel(data) {
+        if (typeof XLSX === 'undefined') {
+            showImportError(['Excelライブラリが読み込まれていません。']);
+            return;
+        }
+
+        const wb = XLSX.read(data, { type: 'array' });
+
+        // 最初のシート（または「シフト枠」シート）を使用
+        let sheetName = wb.SheetNames[0];
+        if (wb.SheetNames.includes('シフト枠')) {
+            sheetName = 'シフト枠';
+        }
+
+        const ws = wb.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        if (jsonData.length < 2) {
+            showImportError(['データが見つかりません。ヘッダー行とデータ行を含めてください。']);
+            return;
+        }
+
+        // ヘッダー行を取得
+        const headers = jsonData[0].map(h => String(h).trim());
+
+        // 必須列のインデックスを確認
+        const dateIdx = findColumnIndex(headers, ['日付', 'date']);
+        const labelIdx = findColumnIndex(headers, ['枠名', 'label', '名前']);
+        const startIdx = findColumnIndex(headers, ['開始時刻', '開始', 'start', '開始時間']);
+        const endIdx = findColumnIndex(headers, ['終了時刻', '終了', 'end', '終了時間']);
+        const staffIdx = findColumnIndex(headers, ['必要人数', '人数', 'staff', '必要スタッフ']);
+
+        if (dateIdx === -1 || startIdx === -1 || endIdx === -1) {
+            showImportError(['必須列が見つかりません。「日付」「開始時刻」「終了時刻」列は必須です。']);
+            return;
+        }
+
+        // データ行を解析
+        const parsedData = [];
+        const errors = [];
+
+        for (let i = 1; i < jsonData.length; i++) {
+            const values = jsonData[i];
+            if (!values || values.length === 0 || values.every(v => !v)) continue;
+
+            // 日付の変換（Excelのシリアル値対応）
+            let dateValue = values[dateIdx];
+            if (typeof dateValue === 'number') {
+                const excelDate = XLSX.SSF.parse_date_code(dateValue);
+                dateValue = `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(excelDate.d).padStart(2, '0')}`;
+            } else {
+                dateValue = String(dateValue || '').trim();
+            }
+
+            // 時刻の変換（Excelのシリアル値対応）
+            let startValue = formatExcelTime(values[startIdx]);
+            let endValue = formatExcelTime(values[endIdx]);
+
+            const row = {
+                date: dateValue,
+                label: String(values[labelIdx] || '').trim(),
+                start: startValue,
+                end: endValue,
+                requiredStaff: parseInt(values[staffIdx]) || 3
+            };
+
+            const rowErrors = validateImportRow(row, i + 1);
+            if (rowErrors.length > 0) {
+                errors.push(...rowErrors);
+            } else {
+                parsedData.push(row);
+            }
+        }
+
+        if (errors.length > 0) {
+            showImportError(errors);
+            return;
+        }
+
+        if (parsedData.length === 0) {
+            showImportError(['有効なデータが見つかりません。']);
+            return;
+        }
+
+        pendingImportData = parsedData;
+        showImportPreview(parsedData);
+    }
+
+    /**
+     * Excelの時刻値をフォーマット
+     */
+    function formatExcelTime(value) {
+        if (value === null || value === undefined || value === '') return '';
+
+        // 既に文字列の場合
+        if (typeof value === 'string') {
+            return value.trim();
+        }
+
+        // Excelのシリアル値（0-1の小数）の場合
+        if (typeof value === 'number' && value >= 0 && value < 1) {
+            const totalMinutes = Math.round(value * 24 * 60);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
+
+        return String(value).trim();
+    }
+
+    /**
+     * CSV行を解析（カンマ区切り、引用符対応）
+     */
+    function parseCSVLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+
+            if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                    current += '"';
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                result.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        result.push(current);
+
+        return result;
+    }
+
+    /**
+     * 列インデックスを検索
+     */
+    function findColumnIndex(headers, possibleNames) {
+        for (let i = 0; i < headers.length; i++) {
+            const header = headers[i].toLowerCase().trim();
+            if (possibleNames.some(name => header.includes(name.toLowerCase()))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * インポート行を検証
+     */
+    function validateImportRow(row, rowNum) {
+        const errors = [];
+
+        // 日付の検証
+        if (!row.date) {
+            errors.push(`${rowNum}行目: 日付が入力されていません`);
+        } else if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) {
+            errors.push(`${rowNum}行目: 日付の形式が不正です（YYYY-MM-DD形式で入力してください）`);
+        }
+
+        // 時刻の検証
+        if (!row.start) {
+            errors.push(`${rowNum}行目: 開始時刻が入力されていません`);
+        } else if (!/^\d{1,2}:\d{2}$/.test(row.start)) {
+            errors.push(`${rowNum}行目: 開始時刻の形式が不正です（HH:MM形式で入力してください）`);
+        }
+
+        if (!row.end) {
+            errors.push(`${rowNum}行目: 終了時刻が入力されていません`);
+        } else if (!/^\d{1,2}:\d{2}$/.test(row.end)) {
+            errors.push(`${rowNum}行目: 終了時刻の形式が不正です（HH:MM形式で入力してください）`);
+        }
+
+        // 時刻の前後関係
+        if (row.start && row.end && row.start >= row.end) {
+            errors.push(`${rowNum}行目: 終了時刻は開始時刻より後にしてください`);
+        }
+
+        // 必要人数の検証
+        if (row.requiredStaff < 1 || row.requiredStaff > 10) {
+            errors.push(`${rowNum}行目: 必要人数は1〜10の範囲で入力してください`);
+        }
+
+        return errors;
+    }
+
+    /**
+     * インポートエラーを表示
+     */
+    function showImportError(errors) {
+        pendingImportData = [];
+
+        if (elements.importPreview) {
+            elements.importPreview.style.display = 'block';
+        }
+
+        if (elements.importPreviewContent) {
+            elements.importPreviewContent.innerHTML = `
+                <div class="import-error">
+                    <p class="import-error__title">エラーが見つかりました</p>
+                    <ul class="import-error__list">
+                        ${errors.slice(0, 10).map(e => `<li>${Utils.escapeHtml(e)}</li>`).join('')}
+                        ${errors.length > 10 ? `<li>...他 ${errors.length - 10} 件のエラー</li>` : ''}
+                    </ul>
+                </div>
+            `;
+        }
+
+        if (elements.btnImportShifts) {
+            elements.btnImportShifts.disabled = true;
+        }
+    }
+
+    /**
+     * インポートプレビューを表示
+     */
+    function showImportPreview(data) {
+        if (elements.importPreview) {
+            elements.importPreview.style.display = 'block';
+        }
+
+        if (elements.importPreviewContent) {
+            const tableRows = data.map(row => `
+                <tr>
+                    <td>${Utils.escapeHtml(row.date)}</td>
+                    <td>${Utils.escapeHtml(row.label || '自動生成')}</td>
+                    <td>${Utils.escapeHtml(row.start)}</td>
+                    <td>${Utils.escapeHtml(row.end)}</td>
+                    <td>${row.requiredStaff}</td>
+                </tr>
+            `).join('');
+
+            elements.importPreviewContent.innerHTML = `
+                <table class="import-preview-table">
+                    <thead>
+                        <tr>
+                            <th>日付</th>
+                            <th>枠名</th>
+                            <th>開始</th>
+                            <th>終了</th>
+                            <th>人数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+                <p class="import-preview__summary">${data.length}件のシフト枠を登録します</p>
+            `;
+        }
+
+        if (elements.btnImportShifts) {
+            elements.btnImportShifts.disabled = false;
+        }
+    }
+
+    /**
+     * インポート状態をリセット
+     */
+    function resetImportState() {
+        pendingImportData = [];
+
+        if (elements.importFileName) {
+            elements.importFileName.textContent = '選択されていません';
+            elements.importFileName.classList.remove('file-upload__name--selected');
+        }
+
+        if (elements.importPreview) {
+            elements.importPreview.style.display = 'none';
+        }
+
+        if (elements.importPreviewContent) {
+            elements.importPreviewContent.innerHTML = '';
+        }
+
+        if (elements.btnImportShifts) {
+            elements.btnImportShifts.disabled = true;
+        }
+
+        if (elements.shiftImportFile) {
+            elements.shiftImportFile.value = '';
+        }
+    }
+
+    /**
+     * シフト枠を一括インポート
+     */
+    function handleImportShifts() {
+        if (pendingImportData.length === 0) {
+            Utils.showMessage('インポートするデータがありません', 'error');
+            return;
+        }
+
+        if (!confirm(`${pendingImportData.length}件のシフト枠を登録します。よろしいですか？`)) {
+            return;
+        }
+
+        let addedCount = 0;
+
+        pendingImportData.forEach(row => {
+            const newSlot = addShiftSlot(row.date, {
+                label: row.label,
+                start: row.start,
+                end: row.end,
+                requiredStaff: row.requiredStaff
+            });
+
+            if (newSlot) {
+                addedCount++;
+            }
+        });
+
+        Utils.showMessage(`${addedCount}件のシフト枠を登録しました`, 'success');
+
+        // 状態をリセット
+        resetImportState();
+
+        // 画面を更新
+        renderCurrentShiftConfig();
+        populateShiftDateSelect();
     }
 
     // 初期化

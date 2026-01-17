@@ -199,6 +199,45 @@
                         <!-- JavaScriptで生成 -->
                     </div>
                 </div>
+
+                <!-- CSV/Excel一括インポート -->
+                <div class="card">
+                    <h2 class="card__title">シフト枠の一括登録</h2>
+                    <p class="card__note">CSVまたはExcelファイルからシフト枠を一括で登録できます。</p>
+
+                    <div class="import-section">
+                        <div class="import-template">
+                            <h4 class="import-template__title">1. テンプレートをダウンロード</h4>
+                            <div class="button-group">
+                                <button type="button" id="btnDownloadCsvTemplate" class="btn btn--secondary btn--small">CSVテンプレート</button>
+                                <button type="button" id="btnDownloadExcelTemplate" class="btn btn--secondary btn--small">Excelテンプレート</button>
+                            </div>
+                        </div>
+
+                        <div class="import-upload">
+                            <h4 class="import-upload__title">2. ファイルをアップロード</h4>
+                            <div class="file-upload">
+                                <input type="file" id="shiftImportFile" class="file-upload__input" accept=".csv,.xlsx,.xls">
+                                <label for="shiftImportFile" class="file-upload__label">
+                                    <span class="file-upload__icon">+</span>
+                                    <span class="file-upload__text">ファイルを選択</span>
+                                </label>
+                                <p class="file-upload__name" id="importFileName">選択されていません</p>
+                            </div>
+                        </div>
+
+                        <div class="import-preview" id="importPreview" style="display: none;">
+                            <h4 class="import-preview__title">3. プレビュー</h4>
+                            <div class="import-preview__content" id="importPreviewContent">
+                                <!-- JavaScriptで生成 -->
+                            </div>
+                        </div>
+
+                        <button type="button" id="btnImportShifts" class="btn btn--primary btn--full" disabled>
+                            シフト枠を一括登録
+                        </button>
+                    </div>
+                </div>
             </section>
 
             <!-- スタッフ管理タブ -->
@@ -260,6 +299,8 @@
         </div>
     </div>
 
+    <!-- SheetJS for Excel support -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/admin.js"></script>
