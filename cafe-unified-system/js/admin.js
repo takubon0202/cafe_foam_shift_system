@@ -484,7 +484,19 @@
                 staffHtml = slotShifts.map(s => {
                     const staff = getStaffById(s.staffId);
                     const roleColor = CONFIG.ROLES[staff?.role]?.color || '#ccc';
-                    return `<span class="staff-tag"><span class="staff-tag__role" style="background-color: ${roleColor}"></span>${Utils.escapeHtml(s.staffName)}（${s.staffId}）</span>`;
+                    return `
+                        <div class="staff-tag-row">
+                            <span class="staff-tag">
+                                <span class="staff-tag__role" style="background-color: ${roleColor}"></span>
+                                ${Utils.escapeHtml(s.staffName)}（${s.staffId}）
+                            </span>
+                            <button type="button" class="btn btn--tiny btn--danger btn-delete-shift"
+                                data-shift-id="${s.id}" data-staff-name="${Utils.escapeHtml(s.staffName)}"
+                                data-date="${date}" data-slot-label="${slot.label}">
+                                取消
+                            </button>
+                        </div>
+                    `;
                 }).join('');
             } else {
                 staffHtml = '<p class="shift-slot-admin__empty">申請者なし</p>';
@@ -504,6 +516,62 @@
         });
 
         elements.shiftSlotsContainer.innerHTML = html;
+
+        // シフト削除ボタンにイベントリスナーを追加
+        elements.shiftSlotsContainer.querySelectorAll('.btn-delete-shift').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // closest()を使用してボタン要素を確実に取得
+                const button = e.target.closest('.btn-delete-shift');
+                if (!button) return;
+                const shiftId = button.dataset.shiftId;
+                const staffName = button.dataset.staffName;
+                const dateStr = button.dataset.date;
+                const slotLabel = button.dataset.slotLabel;
+                handleDeleteShiftApplication(shiftId, staffName, dateStr, slotLabel);
+            });
+        });
+    }
+
+    /**
+     * シフト申請を削除
+     */
+    async function handleDeleteShiftApplication(shiftId, staffName, dateStr, slotLabel) {
+        const d = parseDateStr(dateStr);
+        const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
+
+        if (!confirm(`${staffName}さんの${dateLabel} ${slotLabel}のシフト申請を削除しますか？`)) {
+            return;
+        }
+
+        try {
+            Utils.showLoading(true, 'シフトを削除中...');
+
+            // GASが設定されている場合は、GASからも削除
+            if (isConfigValid()) {
+                try {
+                    const response = await Utils.apiRequest('deleteShift', { shiftId });
+                    if (!response.success) {
+                        console.warn('GASでの削除に失敗:', response.message);
+                    }
+                } catch (error) {
+                    console.warn('GASでのシフト削除エラー:', error);
+                }
+            }
+
+            // ローカルストレージから削除
+            allShiftRequests = allShiftRequests.filter(s => s.id !== shiftId);
+            Utils.saveToStorage(CONFIG.STORAGE_KEYS.SHIFTS, allShiftRequests);
+
+            Utils.showMessage(`${staffName}さんのシフトを削除しました`, 'success');
+            handleShiftDateChange();
+            initStaffTab();
+
+        } catch (error) {
+            console.error('シフト削除エラー:', error);
+            Utils.showMessage('シフトの削除に失敗しました', 'error');
+        } finally {
+            Utils.showLoading(false);
+        }
     }
 
     function handleExportShiftCsv() {
@@ -574,6 +642,9 @@
             const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
             const slots = allSlots[dateStr];
 
+            // 空配列の場合はスキップ（削除された日付）
+            if (!slots || slots.length === 0) return;
+
             html += `
                 <div class="shift-config-date">
                     <h4 class="shift-config-date__title">${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）</h4>
@@ -583,9 +654,15 @@
             slots.forEach(slot => {
                 html += `
                     <div class="shift-config-slot">
-                        <span class="shift-config-slot__label">${slot.label}</span>
-                        <span class="shift-config-slot__time">${slot.start}〜${slot.end}</span>
-                        <span class="shift-config-slot__staff">必要人数: ${slot.requiredStaff || 3}名</span>
+                        <div class="shift-config-slot__info">
+                            <span class="shift-config-slot__label">${slot.label}</span>
+                            <span class="shift-config-slot__time">${slot.start}〜${slot.end}</span>
+                            <span class="shift-config-slot__staff">必要人数: ${slot.requiredStaff || 3}名</span>
+                        </div>
+                        <button type="button" class="btn btn--small btn--danger btn-delete-slot"
+                            data-date="${dateStr}" data-slot-id="${slot.id}" data-slot-label="${slot.label}">
+                            削除
+                        </button>
                     </div>
                 `;
             });
@@ -594,6 +671,36 @@
         });
 
         elements.currentShiftConfig.innerHTML = html;
+
+        // 削除ボタンにイベントリスナーを追加
+        elements.currentShiftConfig.querySelectorAll('.btn-delete-slot').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // closest()を使用してボタン要素を確実に取得
+                const button = e.target.closest('.btn-delete-slot');
+                if (!button) return;
+                const dateStr = button.dataset.date;
+                const slotId = button.dataset.slotId;
+                const slotLabel = button.dataset.slotLabel;
+                handleDeleteShiftSlot(dateStr, slotId, slotLabel);
+            });
+        });
+    }
+
+    /**
+     * シフト枠を削除
+     */
+    function handleDeleteShiftSlot(dateStr, slotId, slotLabel) {
+        const d = parseDateStr(dateStr);
+        const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
+
+        if (!confirm(`${dateLabel}の「${slotLabel}」を削除しますか？\n\nこの枠に登録されているシフト申請も無効になります。`)) {
+            return;
+        }
+
+        removeShiftSlotCompletely(dateStr, slotId);
+        Utils.showMessage(`${dateLabel}の${slotLabel}を削除しました`, 'success');
+        renderCurrentShiftConfig();
+        populateShiftDateSelect();
     }
 
     function handleAddShiftSlot() {

@@ -416,7 +416,7 @@ function getWeekInfo(weekKey) {
 }
 
 /**
- * 日付の営業情報を取得
+ * 日付の営業情報を取得（カスタムシフト枠も考慮）
  */
 function getOperationDate(dateStr) {
     if (CONFIG.DEMO_MODE) {
@@ -434,11 +434,28 @@ function getOperationDate(dateStr) {
             hasAfternoon: true
         };
     }
-    return CONFIG.OPERATION_DATES.find(d => d.date === dateStr) || null;
+
+    // CONFIG.OPERATION_DATESから検索
+    const found = CONFIG.OPERATION_DATES.find(d => d.date === dateStr);
+    if (found) return found;
+
+    // カスタムシフト枠が存在する日付も営業日として扱う
+    const customSlots = getDateShiftSlots(dateStr);
+    if (customSlots && customSlots.length > 0) {
+        const date = parseDateStr(dateStr);
+        return {
+            date: dateStr,
+            weekday: date.getDay(),
+            hasMorning: true,
+            hasAfternoon: true
+        };
+    }
+
+    return null;
 }
 
 /**
- * 指定日が営業日かどうか
+ * 指定日が営業日かどうか（カスタムシフト枠も考慮）
  */
 function isOperationDate(dateStr) {
     if (CONFIG.DEMO_MODE) {
@@ -446,7 +463,15 @@ function isOperationDate(dateStr) {
         const dayOfWeek = date.getDay();
         return dayOfWeek >= 1 && dayOfWeek <= 5;
     }
-    return CONFIG.OPERATION_DATES.some(d => d.date === dateStr);
+
+    // CONFIG.OPERATION_DATESに存在するか
+    if (CONFIG.OPERATION_DATES.some(d => d.date === dateStr)) {
+        return true;
+    }
+
+    // カスタムシフト枠が存在する日付も営業日
+    const customSlots = getDateShiftSlots(dateStr);
+    return customSlots && customSlots.length > 0;
 }
 
 /**
@@ -480,11 +505,21 @@ function getAvailableSlots(dateStr) {
 function getDateShiftSlots(dateStr) {
     // まずローカルストレージからカスタム設定をチェック
     const customSlots = getCustomShiftSlots();
-    if (customSlots && customSlots[dateStr]) {
+    if (customSlots && customSlots[dateStr] !== undefined) {
+        // 空配列の場合は削除された日付として扱う
+        if (customSlots[dateStr].length === 0) {
+            console.log('[getDateShiftSlots] 削除された日付:', dateStr);
+            return [];
+        }
+        console.log('[getDateShiftSlots] カスタム設定を使用:', dateStr, customSlots[dateStr].length, '枠');
         return customSlots[dateStr];
     }
     // CONFIG.DATE_SHIFT_SLOTSから取得
-    return CONFIG.DATE_SHIFT_SLOTS[dateStr] || null;
+    const defaultSlots = CONFIG.DATE_SHIFT_SLOTS[dateStr] || null;
+    if (defaultSlots) {
+        console.log('[getDateShiftSlots] デフォルト設定を使用:', dateStr, defaultSlots.length, '枠');
+    }
+    return defaultSlots;
 }
 
 /**
@@ -518,11 +553,20 @@ function saveCustomShiftSlots(slots) {
  */
 function addShiftSlot(dateStr, slotData) {
     const customSlots = getCustomShiftSlots() || {};
-    if (!customSlots[dateStr]) {
-        customSlots[dateStr] = [];
+
+    // カスタム設定がない場合、デフォルト設定をコピーしてから追加
+    if (!customSlots[dateStr] || customSlots[dateStr].length === 0) {
+        // デフォルト設定が存在する場合はコピー
+        const defaultSlots = CONFIG.DATE_SHIFT_SLOTS[dateStr];
+        if (defaultSlots && defaultSlots.length > 0) {
+            // ディープコピーして元の設定を変更しない
+            customSlots[dateStr] = JSON.parse(JSON.stringify(defaultSlots));
+        } else {
+            customSlots[dateStr] = [];
+        }
     }
 
-    // 新しいIDを生成
+    // 新しいIDを生成（既存のIDと重複しないように）
     const existingIds = customSlots[dateStr].map(s => s.id);
     let newId = `SLOT_${customSlots[dateStr].length + 1}`;
     let counter = customSlots[dateStr].length + 1;
@@ -565,7 +609,7 @@ function addShiftSlot(dateStr, slotData) {
 }
 
 /**
- * 日付のシフト枠を削除
+ * 日付のシフト枠を削除（カスタム設定のみ）
  */
 function removeShiftSlot(dateStr, slotId) {
     const customSlots = getCustomShiftSlots() || {};
@@ -576,6 +620,34 @@ function removeShiftSlot(dateStr, slotId) {
         }
         saveCustomShiftSlots(customSlots);
     }
+    return true;
+}
+
+/**
+ * 日付のシフト枠を完全に削除（デフォルト設定も上書き）
+ * カスタム設定で空配列を設定することで、デフォルト設定を無効化
+ */
+function removeShiftSlotCompletely(dateStr, slotId) {
+    const customSlots = getCustomShiftSlots() || {};
+
+    // その日のシフト枠を取得（デフォルトまたはカスタム）
+    const currentSlots = getDateShiftSlots(dateStr) || [];
+    const newSlots = currentSlots.filter(s => s.id !== slotId);
+
+    // カスタム設定として保存（デフォルト設定を上書き）
+    customSlots[dateStr] = newSlots;
+    saveCustomShiftSlots(customSlots);
+
+    return true;
+}
+
+/**
+ * 日付の全シフト枠を削除
+ */
+function removeAllShiftSlotsForDate(dateStr) {
+    const customSlots = getCustomShiftSlots() || {};
+    customSlots[dateStr] = [];  // 空配列でデフォルトを無効化
+    saveCustomShiftSlots(customSlots);
     return true;
 }
 
@@ -633,7 +705,7 @@ function getStaffByName(name) {
 }
 
 /**
- * 営業日リストを取得
+ * 営業日リストを取得（カスタムシフト枠の日付も含む）
  */
 function getOperationDates() {
     if (CONFIG.DEMO_MODE) {
@@ -652,11 +724,26 @@ function getOperationDates() {
         }
         return dates;
     }
-    return CONFIG.OPERATION_DATES.map(d => d.date);
+
+    // 基本の営業日
+    const baseDates = CONFIG.OPERATION_DATES.map(d => d.date);
+
+    // カスタムシフト枠の日付も追加
+    const customSlots = getCustomShiftSlots();
+    if (customSlots) {
+        Object.keys(customSlots).forEach(dateStr => {
+            if (!baseDates.includes(dateStr)) {
+                baseDates.push(dateStr);
+            }
+        });
+    }
+
+    // 日付順でソート
+    return baseDates.sort();
 }
 
 /**
- * 営業期間を取得
+ * 営業期間を取得（カスタムシフト枠も考慮して動的に拡張）
  */
 function getOperationPeriod() {
     if (CONFIG.DEMO_MODE) {
@@ -668,7 +755,24 @@ function getOperationPeriod() {
             end: formatDateStr(endDate)
         };
     }
-    return CONFIG.OPERATION_PERIOD;
+
+    // 基本の営業期間
+    let start = CONFIG.OPERATION_PERIOD.start;
+    let end = CONFIG.OPERATION_PERIOD.end;
+
+    // カスタムシフト枠の日付も考慮して期間を拡張
+    const customSlots = getCustomShiftSlots();
+    if (customSlots) {
+        Object.keys(customSlots).forEach(dateStr => {
+            // 空配列の日付はスキップ（削除された日付）
+            if (customSlots[dateStr] && customSlots[dateStr].length > 0) {
+                if (dateStr < start) start = dateStr;
+                if (dateStr > end) end = dateStr;
+            }
+        });
+    }
+
+    return { start, end };
 }
 
 /**

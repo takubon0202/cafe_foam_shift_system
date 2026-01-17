@@ -325,4 +325,4 @@ https://takubon0202.github.io/cafe_foam_shift_system/
 
 ---
 
-**最終更新: 2024年12月27日**
+**最終更新: 2025年12月27日**

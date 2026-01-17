@@ -25,6 +25,7 @@
     };
 
     let allShiftRequests = [];
+    let shiftsByDate = new Map();  // 日付ごとのシフトインデックス（パフォーマンス改善用）
     let selectedDate = null;
     let currentDisplayMonth = null; // 現在表示中の月 (Date)
 
@@ -236,9 +237,34 @@
             };
         });
 
+        // パフォーマンス改善: 日付ごとにインデックスを作成
+        buildShiftIndex();
+
         renderCalendar();
         updateStats();
         updateMonthTitle();
+    }
+
+    /**
+     * シフトデータのインデックスを作成（パフォーマンス改善）
+     */
+    function buildShiftIndex() {
+        shiftsByDate.clear();
+        allShiftRequests.forEach(shift => {
+            if (!shift.date) return;
+            if (!shiftsByDate.has(shift.date)) {
+                shiftsByDate.set(shift.date, []);
+            }
+            shiftsByDate.get(shift.date).push(shift);
+        });
+        console.log('[calendar:buildShiftIndex] インデックス作成完了:', shiftsByDate.size, '日分');
+    }
+
+    /**
+     * 日付のシフトを取得（インデックス使用）
+     */
+    function getShiftsForDate(dateStr) {
+        return shiftsByDate.get(dateStr) || [];
     }
 
     /**
@@ -356,7 +382,8 @@
                     </div>
                 `;
             } else {
-                const dayShifts = allShiftRequests.filter(r => r.date === dateStr);
+                // インデックスを使用して高速に取得
+                const dayShifts = getShiftsForDate(dateStr);
                 const slotsHtml = renderDaySlots(dateStr, dayShifts, selectedStaffId, opDate);
 
                 // 特別日ラベル
@@ -453,7 +480,8 @@
 
         elements.selectedDateTitle.textContent = titleText;
 
-        const dayShifts = allShiftRequests.filter(r => r.date === dateStr);
+        // インデックスを使用して高速に取得
+        const dayShifts = getShiftsForDate(dateStr);
         const availableSlots = getAvailableSlots(dateStr);
         let html = '';
 
@@ -491,8 +519,11 @@
                             html += `
                                 <div class="day-detail__staff-row day-detail__staff-row--mine">
                                     <span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>
-                                    <button type="button" class="btn btn--small btn--danger"
-                                        onclick="cancelShiftFromCalendar('${shift.id}', '${Utils.escapeHtml(shift.staffName)}', '${dateStr}', '${slot.id}')">
+                                    <button type="button" class="btn btn--small btn--danger btn-cancel-shift"
+                                        data-shift-id="${shift.id}"
+                                        data-staff-name="${Utils.escapeHtml(shift.staffName)}"
+                                        data-date="${dateStr}"
+                                        data-slot-id="${slot.id}">
                                         キャンセル
                                     </button>
                                 </div>
@@ -519,10 +550,23 @@
 
         elements.dayDetailContent.innerHTML = html;
         elements.dayDetail.style.display = 'block';
+
+        // キャンセルボタンにイベントリスナーを追加
+        elements.dayDetailContent.querySelectorAll('.btn-cancel-shift').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const button = e.target.closest('.btn-cancel-shift');
+                if (!button) return;
+                const shiftId = button.dataset.shiftId;
+                const staffName = button.dataset.staffName;
+                const date = button.dataset.date;
+                const slotId = button.dataset.slotId;
+                cancelShiftFromCalendar(shiftId, staffName, date, slotId);
+            });
+        });
     }
 
     /**
-     * 統計を更新
+     * 統計を更新（インデックス使用で最適化）
      */
     function updateStats() {
         const selectedStaffId = elements.filterStaff.value;
@@ -534,12 +578,14 @@
 
         operationDates.forEach(dateStr => {
             const slots = getAvailableSlots(dateStr);
+            // インデックスを使用して高速に取得
+            const dayShifts = getShiftsForDate(dateStr);
+
             slots.forEach(slot => {
                 totalSlots++;
-                const count = allShiftRequests.filter(r =>
-                    String(r.date) === dateStr && String(r.slotId) === slot.id
-                ).length;
-                const required = getRequiredStaff(slot.id);
+                // 既に取得済みのdayShiftsからフィルタリング（O(n)が1回だけ）
+                const count = dayShifts.filter(r => String(r.slotId) === slot.id).length;
+                const required = slot.requiredStaff || getRequiredStaff(slot.id, dateStr);
 
                 if (count >= required) {
                     filledSlots++;
@@ -595,6 +641,9 @@
             // ローカルストレージからも削除
             allShiftRequests = allShiftRequests.filter(s => s.id !== shiftId);
             Utils.saveToStorage(CONFIG.STORAGE_KEYS.SHIFTS, allShiftRequests);
+
+            // インデックスを再構築
+            buildShiftIndex();
 
             Utils.showMessage('シフトをキャンセルしました', 'success');
 
