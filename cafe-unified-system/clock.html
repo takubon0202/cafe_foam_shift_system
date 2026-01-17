@@ -68,26 +68,11 @@
                 </div>
             </div>
 
-            <!-- シフト選択 -->
+            <!-- シフト選択（動的生成） -->
             <div class="form-group" id="slotSelectGroup" style="display: none;">
                 <label class="form-label">打刻するシフト枠</label>
                 <div class="slot-buttons" id="slotButtons">
-                    <button type="button" class="slot-btn" data-slot="AM_A">
-                        <span class="slot-btn__label">午前A</span>
-                        <span class="slot-btn__time">10:00〜11:30</span>
-                    </button>
-                    <button type="button" class="slot-btn" data-slot="AM_B">
-                        <span class="slot-btn__label">午前B</span>
-                        <span class="slot-btn__time">11:00〜12:30</span>
-                    </button>
-                    <button type="button" class="slot-btn" data-slot="PM_A">
-                        <span class="slot-btn__label">午後A</span>
-                        <span class="slot-btn__time">15:00〜16:30</span>
-                    </button>
-                    <button type="button" class="slot-btn" data-slot="PM_B">
-                        <span class="slot-btn__label">午後B</span>
-                        <span class="slot-btn__time">15:30〜17:00</span>
-                    </button>
+                    <!-- JavaScriptで動的に生成 -->
                 </div>
             </div>
 

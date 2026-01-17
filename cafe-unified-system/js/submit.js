@@ -295,7 +295,7 @@
                         // この枠に登録している他のスタッフを取得
                         const otherStaff = getOtherStaffForSlot(dateStr, slot.id, currentStaffId);
                         const staffCount = otherStaff.length;
-                        const requiredStaff = getRequiredStaff(slot.id);
+                        const requiredStaff = slot.requiredStaff || getRequiredStaff(slot.id, dateStr);
 
                         // 自分が登録済みかどうか
                         const isMySlot = myRegisteredSlots.has(`${dateStr}_${slot.id}`);
@@ -388,14 +388,16 @@
         if (value === 'none') {
             delete weekSelections[weekKey];
         } else {
-            // value形式: "2024-12-26_PM_A" → dateStr="2024-12-26", slotId="PM_A"
+            // value形式: "2024-12-26_SLOT_1" → dateStr="2024-12-26", slotId="SLOT_1"
             const parts = value.split('_');
             const dateStr = parts[0]; // YYYY-MM-DD
-            const slotId = parts.slice(1).join('_'); // PM_A, AM_B など
+            const slotId = parts.slice(1).join('_'); // SLOT_1, SLOT_2 など
+            // 日付ごとのシフト枠情報を取得
+            const slot = getSlotInfo(slotId, dateStr) || CONFIG.SHIFT_SLOTS[slotId];
             weekSelections[weekKey] = {
                 date: dateStr,
                 slotId: slotId,
-                slot: CONFIG.SHIFT_SLOTS[slotId]
+                slot: slot
             };
         }
 
@@ -571,9 +573,9 @@
         let startTime = shift.startTime || '';
         let endTime = shift.endTime || '';
 
-        // ISO形式または無効な形式の場合はCONFIGから取得
+        // ISO形式または無効な形式の場合は設定から取得（日付も考慮）
         if (!startTime || startTime.includes('T') || startTime.includes('1899') || startTime.includes('1900')) {
-            const slot = CONFIG.SHIFT_SLOTS[shift.slotId];
+            const slot = getSlotInfo(shift.slotId, dateStr) || CONFIG.SHIFT_SLOTS[shift.slotId];
             if (slot) {
                 startTime = slot.start;
                 endTime = slot.end;
@@ -583,7 +585,7 @@
         // slotLabelの正規化
         let slotLabel = shift.slotLabel || '';
         if (!slotLabel || slotLabel === 'undefined') {
-            const slot = CONFIG.SHIFT_SLOTS[shift.slotId];
+            const slot = getSlotInfo(shift.slotId, dateStr) || CONFIG.SHIFT_SLOTS[shift.slotId];
             slotLabel = slot ? slot.label : shift.slotId || '';
         }
 

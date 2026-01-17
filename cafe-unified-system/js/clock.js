@@ -31,9 +31,9 @@
         updateDateTime();
         setInterval(updateDateTime, 1000);
         populateStaffSelect();
+        renderSlotButtons();
         setupEventListeners();
         loadLastStaff();
-        updateSlotButtonsForToday();
     }
 
     /**
@@ -46,16 +46,16 @@
 
         // 現在のシフト枠を表示
         const today = Utils.formatDate(now);
-        const availableSlotIds = getAvailableSlotIds(today);
-        const currentSlot = getCurrentShiftSlot(now, availableSlotIds);
+        const availableSlots = getAvailableSlots(today);
+        const currentSlot = getCurrentShiftSlot(now, availableSlots);
 
         if (currentSlot) {
             elements.currentShift.textContent = `${currentSlot.label}シフト（${currentSlot.start}〜${currentSlot.end}）`;
         } else {
-            const nextSlot = getNextShiftSlot(now, availableSlotIds);
+            const nextSlot = getNextShiftSlot(now, availableSlots);
             if (nextSlot) {
                 elements.currentShift.textContent = `次のシフト: ${nextSlot.label}（${nextSlot.start}〜）`;
-            } else if (availableSlotIds.length === 0) {
+            } else if (availableSlots.length === 0) {
                 elements.currentShift.textContent = '本日は営業枠がありません';
             } else {
                 elements.currentShift.textContent = '本日のシフトは終了しました';
@@ -66,10 +66,9 @@
     /**
      * 現在のシフト枠を取得
      */
-    function getCurrentShiftSlot(now, availableSlotIds) {
+    function getCurrentShiftSlot(now, availableSlots) {
         const time = Utils.formatTimeShort(now);
-        for (const slotId of availableSlotIds) {
-            const slot = CONFIG.SHIFT_SLOTS[slotId];
+        for (const slot of availableSlots) {
             if (time >= slot.start && time <= slot.end) {
                 return slot;
             }
@@ -80,11 +79,9 @@
     /**
      * 次のシフト枠を取得
      */
-    function getNextShiftSlot(now, availableSlotIds) {
+    function getNextShiftSlot(now, availableSlots) {
         const time = Utils.formatTimeShort(now);
-        const slots = availableSlotIds
-            .map(id => CONFIG.SHIFT_SLOTS[id])
-            .sort((a, b) => a.start.localeCompare(b.start));
+        const slots = [...availableSlots].sort((a, b) => a.start.localeCompare(b.start));
 
         for (const slot of slots) {
             if (time < slot.start) {
@@ -92,6 +89,28 @@
             }
         }
         return null;
+    }
+
+    /**
+     * シフト枠ボタンを動的に生成
+     */
+    function renderSlotButtons() {
+        const today = Utils.formatDate();
+        const availableSlots = getAvailableSlots(today);
+
+        if (availableSlots.length === 0) {
+            elements.slotButtons.innerHTML = '<p class="today-shift__empty">本日の営業枠はありません</p>';
+            return;
+        }
+
+        const html = availableSlots.map(slot => `
+            <button type="button" class="slot-btn" data-slot="${slot.id}">
+                <span class="slot-btn__label">${slot.label}</span>
+                <span class="slot-btn__time">${slot.start}〜${slot.end}</span>
+            </button>
+        `).join('');
+
+        elements.slotButtons.innerHTML = html;
     }
 
     /**
@@ -113,9 +132,12 @@
     function setupEventListeners() {
         elements.staffSelect.addEventListener('change', handleStaffChange);
 
-        // シフト枠ボタン
-        elements.slotButtons.querySelectorAll('.slot-btn').forEach(btn => {
-            btn.addEventListener('click', () => handleSlotSelect(btn.dataset.slot));
+        // シフト枠ボタン（動的生成のためデリゲーション）
+        elements.slotButtons.addEventListener('click', (e) => {
+            const btn = e.target.closest('.slot-btn');
+            if (btn) {
+                handleSlotSelect(btn.dataset.slot);
+            }
         });
 
         elements.btnClockIn.addEventListener('click', () => handlePunch('in'));
@@ -131,22 +153,6 @@
             elements.staffSelect.value = lastStaffId;
             handleStaffChange();
         }
-    }
-
-    /**
-     * 今日の営業枠に応じてボタンを更新
-     */
-    function updateSlotButtonsForToday() {
-        const today = Utils.formatDate();
-        const availableSlotIds = getAvailableSlotIds(today);
-
-        elements.slotButtons.querySelectorAll('.slot-btn').forEach(btn => {
-            const slotId = btn.dataset.slot;
-            const isAvailable = availableSlotIds.includes(slotId);
-            btn.style.display = isAvailable ? 'flex' : 'none';
-            btn.classList.remove('slot-btn--selected');
-            btn.disabled = !isAvailable;
-        });
     }
 
     /**
@@ -171,13 +177,14 @@
      */
     function loadMyShifts(staffId) {
         const today = Utils.formatDate();
-        const availableSlotIds = getAvailableSlotIds(today);
+        const availableSlots = getAvailableSlots(today);
+        const availableSlotIds = availableSlots.map(s => s.id);
 
         // ローカルストレージからシフト申請を取得
         const allShifts = Utils.getFromStorage(CONFIG.STORAGE_KEYS.SHIFTS) || [];
         myShifts = allShifts.filter(s => s.staffId === staffId && s.date === today);
 
-        if (availableSlotIds.length === 0) {
+        if (availableSlots.length === 0) {
             elements.todayShiftSlots.innerHTML = '<p class="today-shift__empty">本日は営業枠がありません</p>';
             elements.slotSelectGroup.style.display = 'none';
             return;
@@ -185,7 +192,7 @@
 
         if (myShifts.length > 0) {
             const slotsHtml = myShifts.map(shift => {
-                const slotInfo = CONFIG.SHIFT_SLOTS[shift.slotId];
+                const slotInfo = getSlotInfo(shift.slotId, today) || CONFIG.SHIFT_SLOTS[shift.slotId];
                 if (!slotInfo) return '';
                 return `<span class="today-shift__slot">${slotInfo.label}（${slotInfo.start}〜${slotInfo.end}）</span>`;
             }).join('');
@@ -193,19 +200,19 @@
             elements.slotSelectGroup.style.display = 'block';
 
             // 申請済みのシフト枠のみ表示
-            updateSlotButtons(availableSlotIds);
+            updateSlotButtons(availableSlots, availableSlotIds);
         } else {
             elements.todayShiftSlots.innerHTML = '<p class="today-shift__empty">本日のシフト申請はありません</p>';
             elements.slotSelectGroup.style.display = 'block';
             // 全営業枠表示
-            updateSlotButtons(availableSlotIds);
+            updateSlotButtons(availableSlots, availableSlotIds);
         }
     }
 
     /**
      * シフト枠ボタンを更新
      */
-    function updateSlotButtons(availableSlotIds) {
+    function updateSlotButtons(availableSlots, availableSlotIds) {
         elements.slotButtons.querySelectorAll('.slot-btn').forEach(btn => {
             const slotId = btn.dataset.slot;
             const isAvailable = availableSlotIds.includes(slotId);
@@ -285,9 +292,9 @@
 
         const staffName = getStaffName(staffId);
         const today = Utils.formatDate();
-        const availableSlotIds = getAvailableSlotIds(today);
+        const availableSlots = getAvailableSlots(today);
 
-        if (availableSlotIds.length === 0) {
+        if (availableSlots.length === 0) {
             elements.statusDisplay.className = 'status';
             elements.statusDisplay.innerHTML = '<p class="status__text">本日は営業枠がありません</p>';
             return;
@@ -299,7 +306,7 @@
             return;
         }
 
-        const slotInfo = CONFIG.SHIFT_SLOTS[selectedSlot];
+        const slotInfo = getSlotInfo(selectedSlot, today) || CONFIG.SHIFT_SLOTS[selectedSlot];
         const slotRecords = todayRecords.filter(r =>
             r.staffId === staffId && r.slotId === selectedSlot
         );
@@ -310,13 +317,13 @@
 
         if (!lastRecord) {
             elements.statusDisplay.className = 'status';
-            elements.statusDisplay.innerHTML = `<p class="status__text">${staffName}さん: ${slotInfo.label}枠 未打刻</p>`;
+            elements.statusDisplay.innerHTML = `<p class="status__text">${staffName}さん: ${slotInfo?.label || selectedSlot}枠 未打刻</p>`;
         } else if (lastRecord.clockType === 'in') {
             elements.statusDisplay.className = 'status status--in';
-            elements.statusDisplay.innerHTML = `<p class="status__text">${staffName}さん: ${slotInfo.label}枠 出勤中（${lastRecord.time}〜）</p>`;
+            elements.statusDisplay.innerHTML = `<p class="status__text">${staffName}さん: ${slotInfo?.label || selectedSlot}枠 出勤中（${lastRecord.time}〜）</p>`;
         } else {
             elements.statusDisplay.className = 'status status--out';
-            elements.statusDisplay.innerHTML = `<p class="status__text">${staffName}さん: ${slotInfo.label}枠 退勤済み</p>`;
+            elements.statusDisplay.innerHTML = `<p class="status__text">${staffName}さん: ${slotInfo?.label || selectedSlot}枠 退勤済み</p>`;
         }
     }
 
@@ -328,8 +335,8 @@
         const hasStaff = staffId !== '';
         const hasSlot = selectedSlot !== null;
         const today = Utils.formatDate();
-        const availableSlotIds = getAvailableSlotIds(today);
-        const hasAvailableSlots = availableSlotIds.length > 0;
+        const availableSlots = getAvailableSlots(today);
+        const hasAvailableSlots = availableSlots.length > 0;
 
         elements.btnClockIn.disabled = !hasStaff || !hasSlot || !hasAvailableSlots;
         elements.btnClockOut.disabled = !hasStaff || !hasSlot || !hasAvailableSlots;
@@ -341,13 +348,14 @@
     async function handlePunch(clockType) {
         const staffId = elements.staffSelect.value;
         const staffName = getStaffName(staffId);
+        const today = Utils.formatDate();
 
         if (!staffId || !selectedSlot) {
             Utils.showMessage('スタッフとシフト枠を選択してください', 'error');
             return;
         }
 
-        const slotInfo = CONFIG.SHIFT_SLOTS[selectedSlot];
+        const slotInfo = getSlotInfo(selectedSlot, today) || CONFIG.SHIFT_SLOTS[selectedSlot];
         const slotRecords = todayRecords.filter(r =>
             r.staffId === staffId && r.slotId === selectedSlot
         );

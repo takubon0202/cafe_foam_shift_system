@@ -392,55 +392,44 @@
     }
 
     /**
-     * 日付のスロットをレンダリング
+     * 日付のスロットをレンダリング（日付ごとのシフト枠に対応）
      */
     function renderDaySlots(dateStr, dayShifts, selectedStaffId, opDate) {
-        let html = '';
+        const availableSlots = getAvailableSlots(dateStr);
 
-        // 午前・午後でグループ化
-        const periods = [
-            { label: '午前', slots: ['AM_A', 'AM_B'], has: opDate.hasMorning },
-            { label: '午後', slots: ['PM_A', 'PM_B'], has: opDate.hasAfternoon }
-        ];
+        if (availableSlots.length === 0) {
+            return '<div class="calendar-period calendar-period--empty">営業枠なし</div>';
+        }
 
-        periods.forEach(period => {
-            if (!period.has) return;
+        let totalRequired = 0;
+        let totalFilled = 0;
+        let hasMine = false;
 
-            let periodTotal = 0;
-            let periodFilled = 0;
-            let hasMine = false;
+        availableSlots.forEach(slot => {
+            const slotShifts = dayShifts.filter(s => String(s.slotId) === slot.id);
+            const count = slotShifts.length;
+            const required = slot.requiredStaff || getRequiredStaff(slot.id, dateStr);
 
-            period.slots.forEach(slotId => {
-                const slot = CONFIG.SHIFT_SLOTS[slotId];
-                if (!slot) return;
+            totalRequired += required;
+            totalFilled += Math.min(count, required);
 
-                const slotShifts = dayShifts.filter(s => String(s.slotId) === slotId);
-                const count = slotShifts.length;
-                const required = getRequiredStaff(slotId);
-
-                periodTotal += required;
-                periodFilled += Math.min(count, required);
-
-                if (selectedStaffId && slotShifts.some(s => String(s.staffId) === selectedStaffId)) {
-                    hasMine = true;
-                }
-            });
-
-            let statusClass = 'calendar-period';
-            if (hasMine) {
-                statusClass += ' calendar-period--mine';
-            } else if (periodFilled >= periodTotal) {
-                statusClass += ' calendar-period--full';
-            } else if (periodFilled > 0) {
-                statusClass += ' calendar-period--partial';
-            } else {
-                statusClass += ' calendar-period--empty';
+            if (selectedStaffId && slotShifts.some(s => String(s.staffId) === selectedStaffId)) {
+                hasMine = true;
             }
-
-            html += `<div class="${statusClass}">${period.label} ${periodFilled}/${periodTotal}</div>`;
         });
 
-        return html;
+        let statusClass = 'calendar-period';
+        if (hasMine) {
+            statusClass += ' calendar-period--mine';
+        } else if (totalFilled >= totalRequired) {
+            statusClass += ' calendar-period--full';
+        } else if (totalFilled > 0) {
+            statusClass += ' calendar-period--partial';
+        } else {
+            statusClass += ' calendar-period--empty';
+        }
+
+        return `<div class="${statusClass}">${totalFilled}/${totalRequired}名</div>`;
     }
 
     /**
@@ -468,66 +457,65 @@
         const availableSlots = getAvailableSlots(dateStr);
         let html = '';
 
-        Object.entries(CONFIG.SHIFT_SLOTS).forEach(([slotId, slot]) => {
-            const isAvailable = availableSlots.some(s => s.id === slotId);
-            const slotShifts = dayShifts.filter(s => String(s.slotId) === slotId);
-            const count = slotShifts.length;
-            const required = getRequiredStaff(slotId);
+        if (availableSlots.length === 0) {
+            html = '<div class="day-detail__slot day-detail__slot--closed"><div class="day-detail__staff"><span class="day-detail__empty">この日の営業枠はありません</span></div></div>';
+        } else {
+            availableSlots.forEach(slot => {
+                const slotShifts = dayShifts.filter(s => String(s.slotId) === slot.id);
+                const count = slotShifts.length;
+                const required = slot.requiredStaff || getRequiredStaff(slot.id, dateStr);
 
-            let statusClass = 'day-detail__slot';
-            if (!isAvailable) {
-                statusClass += ' day-detail__slot--closed';
-            } else if (count >= required) {
-                statusClass += ' day-detail__slot--full';
-            } else if (count > 0) {
-                statusClass += ' day-detail__slot--partial';
-            } else {
-                statusClass += ' day-detail__slot--empty';
-            }
-
-            html += `
-                <div class="${statusClass}">
-                    <div class="day-detail__slot-header">
-                        <span class="day-detail__slot-label">${slot.label}（${slot.start}〜${slot.end}）</span>
-                        <span class="day-detail__slot-count">${isAvailable ? `${count}/${required}名` : '営業なし'}</span>
-                    </div>
-                    <div class="day-detail__staff">
-            `;
-
-            if (!isAvailable) {
-                html += `<span class="day-detail__empty">この時間帯は営業していません</span>`;
-            } else if (slotShifts.length > 0) {
-                const selectedStaffId = elements.filterStaff.value;
-                slotShifts.forEach(shift => {
-                    const isMine = selectedStaffId && String(shift.staffId) === selectedStaffId;
-                    if (isMine) {
-                        html += `
-                            <div class="day-detail__staff-row day-detail__staff-row--mine">
-                                <span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>
-                                <button type="button" class="btn btn--small btn--danger"
-                                    onclick="cancelShiftFromCalendar('${shift.id}', '${Utils.escapeHtml(shift.staffName)}', '${dateStr}', '${slotId}')">
-                                    キャンセル
-                                </button>
-                            </div>
-                        `;
-                    } else {
-                        html += `<span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>`;
-                    }
-                });
-                if (count < required) {
-                    html += `<span class="day-detail__need">あと${required - count}名必要</span>`;
+                let statusClass = 'day-detail__slot';
+                if (count >= required) {
+                    statusClass += ' day-detail__slot--full';
+                } else if (count > 0) {
+                    statusClass += ' day-detail__slot--partial';
                 } else {
-                    html += `<span class="day-detail__sufficient">スタッフ足りてます</span>`;
+                    statusClass += ' day-detail__slot--empty';
                 }
-            } else {
-                html += `<span class="day-detail__empty">申請者なし（${required}名必要）</span>`;
-            }
 
-            html += `
+                html += `
+                    <div class="${statusClass}">
+                        <div class="day-detail__slot-header">
+                            <span class="day-detail__slot-label">${slot.label}（${slot.start}〜${slot.end}）</span>
+                            <span class="day-detail__slot-count">${count}/${required}名</span>
+                        </div>
+                        <div class="day-detail__staff">
+                `;
+
+                if (slotShifts.length > 0) {
+                    const selectedStaffId = elements.filterStaff.value;
+                    slotShifts.forEach(shift => {
+                        const isMine = selectedStaffId && String(shift.staffId) === selectedStaffId;
+                        if (isMine) {
+                            html += `
+                                <div class="day-detail__staff-row day-detail__staff-row--mine">
+                                    <span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>
+                                    <button type="button" class="btn btn--small btn--danger"
+                                        onclick="cancelShiftFromCalendar('${shift.id}', '${Utils.escapeHtml(shift.staffName)}', '${dateStr}', '${slot.id}')">
+                                        キャンセル
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            html += `<span class="day-detail__staff-name">${Utils.escapeHtml(shift.staffName)}</span>`;
+                        }
+                    });
+                    if (count < required) {
+                        html += `<span class="day-detail__need">あと${required - count}名必要</span>`;
+                    } else {
+                        html += `<span class="day-detail__sufficient">スタッフ足りてます</span>`;
+                    }
+                } else {
+                    html += `<span class="day-detail__empty">申請者なし（${required}名必要）</span>`;
+                }
+
+                html += `
+                        </div>
                     </div>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
 
         elements.dayDetailContent.innerHTML = html;
         elements.dayDetail.style.display = 'block';
@@ -579,7 +567,7 @@
      * カレンダーからシフトをキャンセル
      */
     async function cancelShiftFromCalendar(shiftId, staffName, dateStr, slotId) {
-        const slot = CONFIG.SHIFT_SLOTS[slotId];
+        const slot = getSlotInfo(slotId, dateStr) || CONFIG.SHIFT_SLOTS[slotId];
         const slotLabel = slot ? slot.label : slotId;
         const date = parseDateStr(dateStr);
         const dateLabel = `${date.getMonth() + 1}/${date.getDate()}`;

@@ -31,15 +31,17 @@
         // シフト管理
         shiftDate: document.getElementById('shiftDate'),
         shiftDateTitle: document.getElementById('shiftDateTitle'),
-        AM_ACount: document.getElementById('AM_ACount'),
-        AM_AStaff: document.getElementById('AM_AStaff'),
-        AM_BCount: document.getElementById('AM_BCount'),
-        AM_BStaff: document.getElementById('AM_BStaff'),
-        PM_ACount: document.getElementById('PM_ACount'),
-        PM_AStaff: document.getElementById('PM_AStaff'),
-        PM_BCount: document.getElementById('PM_BCount'),
-        PM_BStaff: document.getElementById('PM_BStaff'),
+        shiftSlotsContainer: document.getElementById('shiftSlotsContainer'),
         btnExportShiftCsv: document.getElementById('btnExportShiftCsv'),
+        // シフト設定
+        newShiftDate: document.getElementById('newShiftDate'),
+        newShiftLabel: document.getElementById('newShiftLabel'),
+        newShiftStart: document.getElementById('newShiftStart'),
+        newShiftEnd: document.getElementById('newShiftEnd'),
+        newShiftStaff: document.getElementById('newShiftStaff'),
+        btnAddShiftSlot: document.getElementById('btnAddShiftSlot'),
+        currentShiftConfig: document.getElementById('currentShiftConfig'),
+        btnResetShiftConfig: document.getElementById('btnResetShiftConfig'),
         // スタッフ
         staffList: document.getElementById('staffList'),
         staffStatsBody: document.getElementById('staffStatsBody'),
@@ -108,6 +110,14 @@
         elements.shiftDate.addEventListener('change', handleShiftDateChange);
         elements.btnExportShiftCsv.addEventListener('click', handleExportShiftCsv);
 
+        // シフト設定
+        if (elements.btnAddShiftSlot) {
+            elements.btnAddShiftSlot.addEventListener('click', handleAddShiftSlot);
+        }
+        if (elements.btnResetShiftConfig) {
+            elements.btnResetShiftConfig.addEventListener('click', handleResetShiftConfig);
+        }
+
         // データ管理
         elements.btnExportData.addEventListener('click', handleExportData);
         elements.btnClearData.addEventListener('click', handleClearData);
@@ -150,6 +160,7 @@
         initAttendanceTab();
         initWeeklyTab();
         initShiftTab();
+        initShiftConfigTab();
         initStaffTab();
     }
 
@@ -433,9 +444,8 @@
             const d = parseDateStr(date);
             const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
             const availableSlots = getAvailableSlots(date);
-            const hasMorning = availableSlots.some(s => s.id.startsWith('AM'));
-            const slotInfo = hasMorning ? '午前・午後' : '午後のみ';
-            return `<option value="${date}">${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）- ${slotInfo}</option>`;
+            const slotCount = availableSlots.length;
+            return `<option value="${date}">${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）- ${slotCount}枠</option>`;
         }).join('');
 
         elements.shiftDate.innerHTML = '<option value="">-- 日付を選択 --</option>' + options;
@@ -455,35 +465,45 @@
         elements.shiftDateTitle.textContent = `${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）`;
 
         const dayShifts = allShiftRequests.filter(r => r.date === date);
-        const required = CONFIG.REQUIRED_STAFF_PER_SLOT;
         const availableSlots = getAvailableSlots(date);
-        const availableSlotIds = availableSlots.map(s => s.id);
 
-        const slotIds = ['AM_A', 'AM_B', 'PM_A', 'PM_B'];
-        slotIds.forEach(slotId => {
-            const isAvailable = availableSlotIds.includes(slotId);
-            const slotShifts = dayShifts.filter(s => s.slotId === slotId);
-            const countEl = elements[`${slotId}Count`];
-            const staffEl = elements[`${slotId}Staff`];
+        if (!elements.shiftSlotsContainer) return;
 
-            if (!countEl || !staffEl) return;
+        if (availableSlots.length === 0) {
+            elements.shiftSlotsContainer.innerHTML = '<p class="shift-slot-admin__empty">この日のシフト枠はありません</p>';
+            return;
+        }
 
-            if (isAvailable) {
-                countEl.textContent = `${slotShifts.length}/${required}`;
-                if (slotShifts.length > 0) {
-                    staffEl.innerHTML = slotShifts.map(s => {
-                        const staff = getStaffById(s.staffId);
-                        const roleColor = CONFIG.ROLES[staff?.role]?.color || '#ccc';
-                        return `<span class="staff-tag"><span class="staff-tag__role" style="background-color: ${roleColor}"></span>${Utils.escapeHtml(s.staffName)}（${s.staffId}）</span>`;
-                    }).join('');
-                } else {
-                    staffEl.innerHTML = '<p class="shift-slot-admin__empty">申請者なし</p>';
-                }
+        let html = '';
+        availableSlots.forEach(slot => {
+            const slotShifts = dayShifts.filter(s => s.slotId === slot.id);
+            const required = slot.requiredStaff || CONFIG.REQUIRED_STAFF_PER_SLOT || 3;
+
+            let staffHtml = '';
+            if (slotShifts.length > 0) {
+                staffHtml = slotShifts.map(s => {
+                    const staff = getStaffById(s.staffId);
+                    const roleColor = CONFIG.ROLES[staff?.role]?.color || '#ccc';
+                    return `<span class="staff-tag"><span class="staff-tag__role" style="background-color: ${roleColor}"></span>${Utils.escapeHtml(s.staffName)}（${s.staffId}）</span>`;
+                }).join('');
             } else {
-                countEl.textContent = '営業なし';
-                staffEl.innerHTML = `<p class="shift-slot-admin__empty">この日は${CONFIG.SHIFT_SLOTS[slotId]?.label || slotId}営業なし</p>`;
+                staffHtml = '<p class="shift-slot-admin__empty">申請者なし</p>';
             }
+
+            html += `
+                <div class="shift-slot-admin">
+                    <div class="shift-slot-admin__header">
+                        <span class="shift-slot-admin__label">${slot.label}（${slot.start}〜${slot.end}）</span>
+                        <span class="shift-slot-admin__count">${slotShifts.length}/${required}</span>
+                    </div>
+                    <div class="shift-slot-admin__staff">
+                        ${staffHtml}
+                    </div>
+                </div>
+            `;
         });
+
+        elements.shiftSlotsContainer.innerHTML = html;
     }
 
     function handleExportShiftCsv() {
@@ -497,15 +517,9 @@
 
         getOperationDates().forEach(date => {
             const availableSlots = getAvailableSlots(date);
-            const availableSlotIds = availableSlots.map(s => s.id);
 
-            Object.entries(CONFIG.SHIFT_SLOTS).forEach(([slotId, slot]) => {
-                if (!availableSlotIds.includes(slotId)) {
-                    rows.push([date, slot.label, '-', '-', '-', '営業なし', '-']);
-                    return;
-                }
-
-                const shifts = allShiftRequests.filter(r => r.date === date && r.slotId === slotId);
+            availableSlots.forEach(slot => {
+                const shifts = allShiftRequests.filter(r => r.date === date && r.slotId === slot.id);
                 if (shifts.length > 0) {
                     shifts.forEach(s => {
                         const week = CONFIG.WEEKS.find(w => w.weekKey === s.weekKey);
@@ -524,6 +538,110 @@
 
         Utils.downloadCSV(csvContent, `シフト表_${Utils.formatDate()}.csv`);
         Utils.showMessage('シフト表をエクスポートしました', 'success');
+    }
+
+    // ========== シフト設定タブ ==========
+
+    function initShiftConfigTab() {
+        if (elements.newShiftDate) {
+            const today = new Date();
+            elements.newShiftDate.value = formatDateStr(today);
+        }
+        renderCurrentShiftConfig();
+    }
+
+    function formatDateStr(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function renderCurrentShiftConfig() {
+        if (!elements.currentShiftConfig) return;
+
+        const allSlots = getAllShiftSlots();
+        const dates = Object.keys(allSlots).sort();
+
+        if (dates.length === 0) {
+            elements.currentShiftConfig.innerHTML = '<p class="shift-slot-admin__empty">シフト設定がありません</p>';
+            return;
+        }
+
+        let html = '';
+        dates.forEach(dateStr => {
+            const d = parseDateStr(dateStr);
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            const slots = allSlots[dateStr];
+
+            html += `
+                <div class="shift-config-date">
+                    <h4 class="shift-config-date__title">${d.getMonth() + 1}/${d.getDate()}（${weekdays[d.getDay()]}）</h4>
+                    <div class="shift-config-slots">
+            `;
+
+            slots.forEach(slot => {
+                html += `
+                    <div class="shift-config-slot">
+                        <span class="shift-config-slot__label">${slot.label}</span>
+                        <span class="shift-config-slot__time">${slot.start}〜${slot.end}</span>
+                        <span class="shift-config-slot__staff">必要人数: ${slot.requiredStaff || 3}名</span>
+                    </div>
+                `;
+            });
+
+            html += '</div></div>';
+        });
+
+        elements.currentShiftConfig.innerHTML = html;
+    }
+
+    function handleAddShiftSlot() {
+        const dateStr = elements.newShiftDate?.value;
+        const label = elements.newShiftLabel?.value || '';
+        const start = elements.newShiftStart?.value;
+        const end = elements.newShiftEnd?.value;
+        const requiredStaff = parseInt(elements.newShiftStaff?.value) || 3;
+
+        if (!dateStr) {
+            Utils.showMessage('日付を選択してください', 'error');
+            return;
+        }
+        if (!start || !end) {
+            Utils.showMessage('開始時刻と終了時刻を入力してください', 'error');
+            return;
+        }
+        if (start >= end) {
+            Utils.showMessage('終了時刻は開始時刻より後にしてください', 'error');
+            return;
+        }
+
+        const newSlot = addShiftSlot(dateStr, {
+            label: label,
+            start: start,
+            end: end,
+            requiredStaff: requiredStaff
+        });
+
+        if (newSlot) {
+            Utils.showMessage(`${dateStr}に${newSlot.label}（${start}〜${end}）を追加しました`, 'success');
+            renderCurrentShiftConfig();
+            populateShiftDateSelect();
+
+            // フォームをリセット
+            if (elements.newShiftLabel) elements.newShiftLabel.value = '';
+        }
+    }
+
+    function handleResetShiftConfig() {
+        if (!confirm('カスタム設定をリセットしますか？デフォルトの設定に戻ります。')) {
+            return;
+        }
+
+        localStorage.removeItem('cafe_custom_shift_slots');
+        Utils.showMessage('カスタム設定をリセットしました', 'success');
+        renderCurrentShiftConfig();
+        populateShiftDateSelect();
     }
 
     // ========== スタッフタブ ==========

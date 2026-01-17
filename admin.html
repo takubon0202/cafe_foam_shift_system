@@ -42,6 +42,7 @@
                 <button class="tab tab--active" data-tab="attendance">勤怠一覧</button>
                 <button class="tab" data-tab="weekly">週別確認</button>
                 <button class="tab" data-tab="shifts">シフト管理</button>
+                <button class="tab" data-tab="shiftConfig">シフト設定</button>
                 <button class="tab" data-tab="staff">スタッフ</button>
             </div>
 
@@ -141,48 +142,11 @@
                     </div>
                 </div>
 
-                <!-- シフト状況 -->
+                <!-- シフト状況（動的生成） -->
                 <div class="card" id="shiftStatusCard">
                     <h3 class="card__title" id="shiftDateTitle">-</h3>
-
-                    <div class="shift-slot-admin">
-                        <div class="shift-slot-admin__header">
-                            <span class="shift-slot-admin__label">午前A（10:00〜11:30）</span>
-                            <span class="shift-slot-admin__count" id="AM_ACount">0/3</span>
-                        </div>
-                        <div class="shift-slot-admin__staff" id="AM_AStaff">
-                            <p class="shift-slot-admin__empty">申請者なし</p>
-                        </div>
-                    </div>
-
-                    <div class="shift-slot-admin">
-                        <div class="shift-slot-admin__header">
-                            <span class="shift-slot-admin__label">午前B（11:00〜12:30）</span>
-                            <span class="shift-slot-admin__count" id="AM_BCount">0/3</span>
-                        </div>
-                        <div class="shift-slot-admin__staff" id="AM_BStaff">
-                            <p class="shift-slot-admin__empty">申請者なし</p>
-                        </div>
-                    </div>
-
-                    <div class="shift-slot-admin">
-                        <div class="shift-slot-admin__header">
-                            <span class="shift-slot-admin__label">午後A（15:00〜16:30）</span>
-                            <span class="shift-slot-admin__count" id="PM_ACount">0/3</span>
-                        </div>
-                        <div class="shift-slot-admin__staff" id="PM_AStaff">
-                            <p class="shift-slot-admin__empty">申請者なし</p>
-                        </div>
-                    </div>
-
-                    <div class="shift-slot-admin">
-                        <div class="shift-slot-admin__header">
-                            <span class="shift-slot-admin__label">午後B（15:30〜17:00）</span>
-                            <span class="shift-slot-admin__count" id="PM_BCount">0/3</span>
-                        </div>
-                        <div class="shift-slot-admin__staff" id="PM_BStaff">
-                            <p class="shift-slot-admin__empty">申請者なし</p>
-                        </div>
+                    <div id="shiftSlotsContainer">
+                        <!-- JavaScriptで動的に生成 -->
                     </div>
                 </div>
 
@@ -190,6 +154,58 @@
                 <div class="card">
                     <h3 class="card__title">シフト一括出力</h3>
                     <button type="button" id="btnExportShiftCsv" class="btn btn--primary btn--full">全シフトをCSV出力</button>
+                </div>
+            </section>
+
+            <!-- シフト設定タブ -->
+            <section class="tab-content" id="tabShiftConfig">
+                <div class="card">
+                    <h2 class="card__title">シフト枠の追加</h2>
+                    <p class="card__note">新しいシフト枠を追加できます。日付と時間を指定してください。</p>
+
+                    <div class="form-group">
+                        <label for="newShiftDate" class="form-label">日付</label>
+                        <input type="date" id="newShiftDate" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newShiftLabel" class="form-label">枠名</label>
+                        <input type="text" id="newShiftLabel" class="form-input" placeholder="例: 枠1">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group form-group--half">
+                            <label for="newShiftStart" class="form-label">開始時刻</label>
+                            <input type="time" id="newShiftStart" class="form-input" value="14:40">
+                        </div>
+                        <div class="form-group form-group--half">
+                            <label for="newShiftEnd" class="form-label">終了時刻</label>
+                            <input type="time" id="newShiftEnd" class="form-input" value="16:10">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newShiftStaff" class="form-label">必要人数</label>
+                        <input type="number" id="newShiftStaff" class="form-input" value="3" min="1" max="10">
+                    </div>
+
+                    <button type="button" id="btnAddShiftSlot" class="btn btn--primary btn--full">シフト枠を追加</button>
+                </div>
+
+                <!-- 現在のシフト設定一覧 -->
+                <div class="card">
+                    <h3 class="card__title">現在のシフト設定</h3>
+                    <div id="currentShiftConfig">
+                        <!-- JavaScriptで生成 -->
+                    </div>
+                </div>
+
+                <!-- シフト設定の初期化 -->
+                <div class="card card--danger">
+                    <h3 class="card__title">シフト設定の管理</h3>
+                    <div class="button-group">
+                        <button type="button" id="btnResetShiftConfig" class="btn btn--danger">カスタム設定をリセット</button>
+                    </div>
                 </div>
             </section>
 

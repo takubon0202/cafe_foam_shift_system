@@ -10,8 +10,8 @@ const CONFIG = {
 
     // Google Apps Script WebアプリURL
     GAS_URL: {
-        production: 'https://script.google.com/macros/s/AKfycbwOXbqf2JWYep9Jvushbr3wywyheDlWh-Fjxc26u-DjAkHbxE3VwuNhtvmE7FYEAhrokg/exec',
-        development: 'https://script.google.com/macros/s/AKfycbwOXbqf2JWYep9Jvushbr3wywyheDlWh-Fjxc26u-DjAkHbxE3VwuNhtvmE7FYEAhrokg/exec'
+        production: 'https://script.google.com/macros/s/AKfycbxqWXUs4Z7XHWtOamIxp0NV3xFwLlU2MytWoLx8-bB8XugyuyhaO_MfTAdtwwQumVQ2/exec',
+        development: 'https://script.google.com/macros/s/AKfycbxqWXUs4Z7XHWtOamIxp0NV3xFwLlU2MytWoLx8-bB8XugyuyhaO_MfTAdtwwQumVQ2/exec'
     },
 
     // 現在の環境
@@ -33,120 +33,101 @@ const CONFIG = {
     OPERATION_PERIOD: {
         // プレオープン期間
         preopen: {
-            start: '2026-01-14',  // レセプション
-            end: '2026-01-30'
+            start: '2026-01-21',
+            end: '2026-01-27'
         },
         // グランドオープン期間
         grandopen: {
             start: '2026-04-06',
-            end: '2026-04-30'  // 仮の終了日（必要に応じて延長）
+            end: '2026-04-30'
         },
-        // 現在のアクティブ期間（プレオープンまたはグランドオープン）
-        start: '2026-01-14',
-        end: '2026-01-30'
+        // 現在のアクティブ期間
+        start: '2026-01-21',
+        end: '2026-01-27'
     },
 
-    // 特別日（レセプション等）
-    SPECIAL_DATES: {
-        '2026-01-14': {
-            type: 'reception',
-            label: 'レセプション',
-            note: '午後のみ営業'
-        }
-    },
+    // 特別日
+    SPECIAL_DATES: {},
 
-    // 営業時間情報
+    // 営業時間情報（日付により異なるため参考値）
     BUSINESS_HOURS: {
-        morning: '10:00〜12:30',
-        afternoon: '15:00〜17:00'
+        morning: '10:40〜13:40',
+        afternoon: '14:40〜17:40'
     },
 
     // =======================================================================
-    // シフト枠定義（90分単位・重複OK）
+    // シフト枠定義（日付ごとに異なる時間帯対応）
     // =======================================================================
 
+    // グローバルシフト枠（レガシー互換・フォールバック用）
     SHIFT_SLOTS: {
-        AM_A: {
-            id: 'AM_A',
-            label: '午前A',
-            start: '10:00',
-            end: '11:30',
-            period: 'morning',
-            duration: 90,
-            requiredStaff: 3  // この枠の必要人数（個別設定可能）
-        },
-        AM_B: {
-            id: 'AM_B',
-            label: '午前B',
-            start: '11:00',
-            end: '12:30',
-            period: 'morning',
-            duration: 90,
-            requiredStaff: 3
-        },
-        PM_A: {
-            id: 'PM_A',
-            label: '午後A',
-            start: '15:00',
-            end: '16:30',
+        SLOT_1: {
+            id: 'SLOT_1',
+            label: '枠1',
+            start: '14:40',
+            end: '16:10',
             period: 'afternoon',
             duration: 90,
             requiredStaff: 3
         },
-        PM_B: {
-            id: 'PM_B',
-            label: '午後B',
-            start: '15:30',
-            end: '17:00',
+        SLOT_2: {
+            id: 'SLOT_2',
+            label: '枠2',
+            start: '16:10',
+            end: '17:40',
             period: 'afternoon',
             duration: 90,
             requiredStaff: 3
         }
+    },
+
+    // 日付ごとのシフト枠定義（新構造）
+    // 管理画面から動的に追加・編集可能
+    DATE_SHIFT_SLOTS: {
+        '2026-01-21': [
+            { id: 'SLOT_1', label: '枠1', start: '14:40', end: '16:10', requiredStaff: 3 },
+            { id: 'SLOT_2', label: '枠2', start: '16:10', end: '17:40', requiredStaff: 3 }
+        ],
+        '2026-01-22': [
+            { id: 'SLOT_1', label: '枠1', start: '14:40', end: '16:10', requiredStaff: 3 },
+            { id: 'SLOT_2', label: '枠2', start: '16:10', end: '17:40', requiredStaff: 3 }
+        ],
+        '2026-01-23': [
+            { id: 'SLOT_1', label: '枠1', start: '10:40', end: '12:10', requiredStaff: 3 },
+            { id: 'SLOT_2', label: '枠2', start: '12:10', end: '13:40', requiredStaff: 3 }
+        ],
+        '2026-01-26': [
+            { id: 'SLOT_1', label: '枠1', start: '14:40', end: '16:10', requiredStaff: 3 },
+            { id: 'SLOT_2', label: '枠2', start: '16:10', end: '17:40', requiredStaff: 3 }
+        ],
+        '2026-01-27': [
+            { id: 'SLOT_1', label: '枠1', start: '10:40', end: '12:10', requiredStaff: 3 },
+            { id: 'SLOT_2', label: '枠2', start: '12:10', end: '13:40', requiredStaff: 3 }
+        ]
     },
 
     // =======================================================================
     // 営業日・営業枠設定
     // =======================================================================
 
-    // 営業日リスト（プレオープン期間: 2026年1月）
-    // 火・金 = 午前+午後、月・水・木 = 午後のみ、土日 = 休み
+    // 営業日リスト（2026年1月）
     OPERATION_DATES: [
-        // 1/14週（レセプション + プレオープン開始）
-        { date: '2026-01-14', weekday: 3, hasMorning: false, hasAfternoon: true, isSpecial: true, label: 'レセプション' },
-        { date: '2026-01-15', weekday: 4, hasMorning: false, hasAfternoon: true, label: 'プレオープン初日' },
-        { date: '2026-01-16', weekday: 5, hasMorning: true, hasAfternoon: true },
         // 1/19週
-        { date: '2026-01-19', weekday: 1, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-20', weekday: 2, hasMorning: true, hasAfternoon: true },
         { date: '2026-01-21', weekday: 3, hasMorning: false, hasAfternoon: true },
         { date: '2026-01-22', weekday: 4, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-23', weekday: 5, hasMorning: true, hasAfternoon: true },
+        { date: '2026-01-23', weekday: 5, hasMorning: true, hasAfternoon: false },
         // 1/26週
         { date: '2026-01-26', weekday: 1, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-27', weekday: 2, hasMorning: true, hasAfternoon: true },
-        { date: '2026-01-28', weekday: 3, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-29', weekday: 4, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-30', weekday: 5, hasMorning: true, hasAfternoon: true, label: 'プレオープン最終日' }
+        { date: '2026-01-27', weekday: 2, hasMorning: true, hasAfternoon: false }
     ],
 
-    // 日付ごとの営業枠設定（DEMO_MODE=false時に使用）
+    // 日付ごとの営業枠ID設定
     DATE_SLOTS: {
-        // 1/14週
-        '2026-01-14': ['PM_A', 'PM_B'],  // レセプション（午後のみ）
-        '2026-01-15': ['PM_A', 'PM_B'],  // 木曜（午後のみ）
-        '2026-01-16': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 金曜（午前+午後）
-        // 1/19週
-        '2026-01-19': ['PM_A', 'PM_B'],  // 月曜
-        '2026-01-20': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 火曜
-        '2026-01-21': ['PM_A', 'PM_B'],  // 水曜
-        '2026-01-22': ['PM_A', 'PM_B'],  // 木曜
-        '2026-01-23': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 金曜
-        // 1/26週
-        '2026-01-26': ['PM_A', 'PM_B'],  // 月曜
-        '2026-01-27': ['AM_A', 'AM_B', 'PM_A', 'PM_B'],  // 火曜
-        '2026-01-28': ['PM_A', 'PM_B'],  // 水曜
-        '2026-01-29': ['PM_A', 'PM_B'],  // 木曜
-        '2026-01-30': ['AM_A', 'AM_B', 'PM_A', 'PM_B']   // 金曜（最終日）
+        '2026-01-21': ['SLOT_1', 'SLOT_2'],
+        '2026-01-22': ['SLOT_1', 'SLOT_2'],
+        '2026-01-23': ['SLOT_1', 'SLOT_2'],
+        '2026-01-26': ['SLOT_1', 'SLOT_2'],
+        '2026-01-27': ['SLOT_1', 'SLOT_2']
     },
 
     // =======================================================================
@@ -156,22 +137,16 @@ const CONFIG = {
     // 週の定義（weekKey = その週の月曜日の日付）
     WEEKS: [
         {
-            weekKey: '2026-01-12',
-            label: '1/12週',
-            description: 'レセプション〜プレオープン開始',
-            dates: ['2026-01-14', '2026-01-15', '2026-01-16']
-        },
-        {
             weekKey: '2026-01-19',
             label: '1/19週',
-            description: 'プレオープン第2週',
-            dates: ['2026-01-19', '2026-01-20', '2026-01-21', '2026-01-22', '2026-01-23']
+            description: '1月第3週',
+            dates: ['2026-01-21', '2026-01-22', '2026-01-23']
         },
         {
             weekKey: '2026-01-26',
             label: '1/26週',
-            description: 'プレオープン最終週',
-            dates: ['2026-01-26', '2026-01-27', '2026-01-28', '2026-01-29', '2026-01-30']
+            description: '1月第4週',
+            dates: ['2026-01-26', '2026-01-27']
         }
     ],
 
@@ -475,26 +450,145 @@ function isOperationDate(dateStr) {
 }
 
 /**
- * 指定日の営業枠を取得
+ * 指定日の営業枠を取得（日付ごとのシフト枠定義に対応）
  */
 function getAvailableSlots(dateStr) {
+    // まずDATE_SHIFT_SLOTSをチェック（新構造）
+    const dateSlots = getDateShiftSlots(dateStr);
+    if (dateSlots && dateSlots.length > 0) {
+        return dateSlots;
+    }
+
+    // フォールバック: 旧構造
     const opDate = getOperationDate(dateStr);
     if (!opDate) return [];
 
     const slots = [];
-    if (opDate.hasMorning) {
-        slots.push(CONFIG.SHIFT_SLOTS.AM_A, CONFIG.SHIFT_SLOTS.AM_B);
-    }
-    if (opDate.hasAfternoon) {
-        slots.push(CONFIG.SHIFT_SLOTS.PM_A, CONFIG.SHIFT_SLOTS.PM_B);
-    }
+    const slotIds = CONFIG.DATE_SLOTS[dateStr] || [];
+    slotIds.forEach(id => {
+        if (CONFIG.SHIFT_SLOTS[id]) {
+            slots.push(CONFIG.SHIFT_SLOTS[id]);
+        }
+    });
     return slots;
+}
+
+/**
+ * 指定日のシフト枠定義を取得（DATE_SHIFT_SLOTSから）
+ * ローカルストレージのカスタム設定も考慮
+ */
+function getDateShiftSlots(dateStr) {
+    // まずローカルストレージからカスタム設定をチェック
+    const customSlots = getCustomShiftSlots();
+    if (customSlots && customSlots[dateStr]) {
+        return customSlots[dateStr];
+    }
+    // CONFIG.DATE_SHIFT_SLOTSから取得
+    return CONFIG.DATE_SHIFT_SLOTS[dateStr] || null;
+}
+
+/**
+ * ローカルストレージからカスタムシフト設定を取得
+ */
+function getCustomShiftSlots() {
+    try {
+        const stored = localStorage.getItem('cafe_custom_shift_slots');
+        return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+        console.warn('[getCustomShiftSlots] エラー:', e);
+        return null;
+    }
+}
+
+/**
+ * カスタムシフト設定をローカルストレージに保存
+ */
+function saveCustomShiftSlots(slots) {
+    try {
+        localStorage.setItem('cafe_custom_shift_slots', JSON.stringify(slots));
+        return true;
+    } catch (e) {
+        console.error('[saveCustomShiftSlots] エラー:', e);
+        return false;
+    }
+}
+
+/**
+ * 日付にシフト枠を追加
+ */
+function addShiftSlot(dateStr, slotData) {
+    const customSlots = getCustomShiftSlots() || {};
+    if (!customSlots[dateStr]) {
+        customSlots[dateStr] = [];
+    }
+
+    // 新しいIDを生成
+    const existingIds = customSlots[dateStr].map(s => s.id);
+    let newId = `SLOT_${customSlots[dateStr].length + 1}`;
+    let counter = customSlots[dateStr].length + 1;
+    while (existingIds.includes(newId)) {
+        counter++;
+        newId = `SLOT_${counter}`;
+    }
+
+    const newSlot = {
+        id: newId,
+        label: slotData.label || `枠${counter}`,
+        start: slotData.start,
+        end: slotData.end,
+        requiredStaff: slotData.requiredStaff || 3
+    };
+
+    customSlots[dateStr].push(newSlot);
+    saveCustomShiftSlots(customSlots);
+
+    // DATE_SLOTSも更新
+    if (!CONFIG.DATE_SLOTS[dateStr]) {
+        CONFIG.DATE_SLOTS[dateStr] = [];
+    }
+    if (!CONFIG.DATE_SLOTS[dateStr].includes(newId)) {
+        CONFIG.DATE_SLOTS[dateStr].push(newId);
+    }
+
+    // OPERATION_DATESも更新
+    if (!CONFIG.OPERATION_DATES.find(d => d.date === dateStr)) {
+        const date = parseDateStr(dateStr);
+        CONFIG.OPERATION_DATES.push({
+            date: dateStr,
+            weekday: date.getDay(),
+            hasMorning: true,
+            hasAfternoon: true
+        });
+    }
+
+    return newSlot;
+}
+
+/**
+ * 日付のシフト枠を削除
+ */
+function removeShiftSlot(dateStr, slotId) {
+    const customSlots = getCustomShiftSlots() || {};
+    if (customSlots[dateStr]) {
+        customSlots[dateStr] = customSlots[dateStr].filter(s => s.id !== slotId);
+        if (customSlots[dateStr].length === 0) {
+            delete customSlots[dateStr];
+        }
+        saveCustomShiftSlots(customSlots);
+    }
+    return true;
 }
 
 /**
  * 指定日の営業枠ID配列を取得
  */
 function getAvailableSlotIds(dateStr) {
+    // まずDATE_SHIFT_SLOTSをチェック（新構造）
+    const dateSlots = getDateShiftSlots(dateStr);
+    if (dateSlots && dateSlots.length > 0) {
+        return dateSlots.map(s => s.id);
+    }
+
     if (CONFIG.DEMO_MODE) {
         const date = parseDateStr(dateStr);
         const dayOfWeek = date.getDay();
@@ -503,11 +597,7 @@ function getAvailableSlotIds(dateStr) {
             return [];
         }
 
-        if (dayOfWeek === 2 || dayOfWeek === 5) {
-            return ['AM_A', 'AM_B', 'PM_A', 'PM_B'];
-        } else {
-            return ['PM_A', 'PM_B'];
-        }
+        return ['SLOT_1', 'SLOT_2'];
     }
     return CONFIG.DATE_SLOTS[dateStr] || [];
 }
@@ -640,10 +730,23 @@ function getTotalSlotCount() {
 
 /**
  * 特定シフト枠の必要人数を取得
- * @param {string} slotId - シフト枠ID (例: 'AM_A', 'PM_B')
+ * @param {string} slotId - シフト枠ID
+ * @param {string} dateStr - 日付（オプション）
  * @returns {number} - 必要人数（デフォルト: 3）
  */
-function getRequiredStaff(slotId) {
+function getRequiredStaff(slotId, dateStr) {
+    // 日付が指定されている場合、その日のシフト枠から取得
+    if (dateStr) {
+        const dateSlots = getDateShiftSlots(dateStr);
+        if (dateSlots) {
+            const slot = dateSlots.find(s => s.id === slotId);
+            if (slot && typeof slot.requiredStaff === 'number') {
+                return slot.requiredStaff;
+            }
+        }
+    }
+
+    // グローバル設定から取得
     const slot = CONFIG.SHIFT_SLOTS[slotId];
     if (slot && typeof slot.requiredStaff === 'number') {
         return slot.requiredStaff;
@@ -655,8 +758,43 @@ function getRequiredStaff(slotId) {
 /**
  * シフト枠情報を取得
  * @param {string} slotId - シフト枠ID
+ * @param {string} dateStr - 日付（オプション）
  * @returns {Object|null} - シフト枠情報
  */
-function getSlotInfo(slotId) {
+function getSlotInfo(slotId, dateStr) {
+    // 日付が指定されている場合、その日のシフト枠から取得
+    if (dateStr) {
+        const dateSlots = getDateShiftSlots(dateStr);
+        if (dateSlots) {
+            const slot = dateSlots.find(s => s.id === slotId);
+            if (slot) {
+                return slot;
+            }
+        }
+    }
+
+    // グローバル設定から取得
     return CONFIG.SHIFT_SLOTS[slotId] || null;
+}
+
+/**
+ * 全ての営業日とシフト枠を取得（管理画面用）
+ */
+function getAllShiftSlots() {
+    const result = {};
+
+    // CONFIG.DATE_SHIFT_SLOTSから
+    Object.keys(CONFIG.DATE_SHIFT_SLOTS || {}).forEach(dateStr => {
+        result[dateStr] = CONFIG.DATE_SHIFT_SLOTS[dateStr];
+    });
+
+    // カスタム設定から（上書き）
+    const customSlots = getCustomShiftSlots();
+    if (customSlots) {
+        Object.keys(customSlots).forEach(dateStr => {
+            result[dateStr] = customSlots[dateStr];
+        });
+    }
+
+    return result;
 }
