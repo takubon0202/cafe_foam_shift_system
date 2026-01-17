@@ -890,6 +890,54 @@ body {
     color: var(--color-text-muted);
 }
 
+/* シフト枠削除ボタン */
+.shift-config-slot .btn-delete-slot {
+    display: inline-flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    background-color: var(--color-error);
+    color: var(--color-white);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    min-width: 50px;
+    min-height: auto;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+}
+
+.shift-config-slot .btn-delete-slot:hover {
+    background-color: #C62828;
+    transform: scale(1.05);
+}
+
+.shift-config-slot .btn-delete-slot:active {
+    transform: scale(0.95);
+}
+
+/* レスポンシブ対応：小さい画面では枠を縦並びに */
+@media (max-width: 480px) {
+    .shift-config-slot {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+
+    .shift-config-slot__info {
+        justify-content: space-between;
+    }
+
+    .shift-config-slot .btn-delete-slot {
+        width: 100%;
+        padding: var(--spacing-sm);
+    }
+}
+
 /* ===========================================
    Period Info & Calendar Navigation
    =========================================== */

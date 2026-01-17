@@ -673,14 +673,20 @@
         elements.currentShiftConfig.innerHTML = html;
 
         // 削除ボタンにイベントリスナーを追加
-        elements.currentShiftConfig.querySelectorAll('.btn-delete-slot').forEach(btn => {
+        const deleteButtons = elements.currentShiftConfig.querySelectorAll('.btn-delete-slot');
+        console.log('[renderCurrentShiftConfig] 削除ボタン数:', deleteButtons.length);
+
+        deleteButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 // closest()を使用してボタン要素を確実に取得
                 const button = e.target.closest('.btn-delete-slot');
                 if (!button) return;
                 const dateStr = button.dataset.date;
                 const slotId = button.dataset.slotId;
                 const slotLabel = button.dataset.slotLabel;
+                console.log('[btn-delete-slot] クリック:', { dateStr, slotId, slotLabel });
                 handleDeleteShiftSlot(dateStr, slotId, slotLabel);
             });
         });
@@ -690,14 +696,19 @@
      * シフト枠を削除
      */
     function handleDeleteShiftSlot(dateStr, slotId, slotLabel) {
+        console.log('[handleDeleteShiftSlot] 削除リクエスト:', { dateStr, slotId, slotLabel });
+
         const d = parseDateStr(dateStr);
         const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
 
         if (!confirm(`${dateLabel}の「${slotLabel}」を削除しますか？\n\nこの枠に登録されているシフト申請も無効になります。`)) {
+            console.log('[handleDeleteShiftSlot] ユーザーがキャンセル');
             return;
         }
 
         removeShiftSlotCompletely(dateStr, slotId);
+        console.log('[handleDeleteShiftSlot] 削除完了:', dateStr, slotId);
+
         Utils.showMessage(`${dateLabel}の${slotLabel}を削除しました`, 'success');
         renderCurrentShiftConfig();
         populateShiftDateSelect();
