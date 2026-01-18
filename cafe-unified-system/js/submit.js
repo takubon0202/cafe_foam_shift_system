@@ -267,9 +267,23 @@
         weeks.forEach(week => {
             const isRegistered = registeredWeeks.has(week.weekKey);
 
+            // 週のラベルと日付範囲を生成
+            const weekRange = formatWeekRange(week);
+            let weekLabel = week.label;
+
+            // カスタム週（CONFIG.WEEKSに存在しない週）の場合、日付ベースのラベルに変更
+            const isCustomWeek = !CONFIG.WEEKS.some(w => w.weekKey === week.weekKey);
+            if (isCustomWeek && weekRange) {
+                // カスタム週は日付範囲をラベルとして使用
+                weekLabel = weekRange + '週';
+            }
+
+            // ラベルと範囲が重複しないよう調整
+            const displayRange = isCustomWeek ? '' : `（${weekRange}）`;
+
             html += `
                 <section class="card week-card ${isRegistered ? 'week-card--registered' : ''}">
-                    <h2 class="card__title week-title">${week.label}（${formatWeekRange(week)}）</h2>
+                    <h2 class="card__title week-title">${weekLabel}${displayRange}</h2>
             `;
 
             if (isRegistered) {
@@ -378,8 +392,29 @@
      */
     function formatWeekRange(week) {
         if (week.dates.length === 0) return '';
-        const first = formatDateDisplay(week.dates[0]).split('（')[0];
-        const last = formatDateDisplay(week.dates[week.dates.length - 1]).split('（')[0];
+
+        // 実際にシフト枠がある日付のみをフィルタリング
+        const datesWithSlots = week.dates.filter(dateStr => {
+            const slots = getAvailableSlots(dateStr);
+            return slots && slots.length > 0;
+        });
+
+        if (datesWithSlots.length === 0) return '';
+
+        const first = formatDateDisplay(datesWithSlots[0]).split('（')[0];
+
+        // 1日のみの場合は範囲表示しない
+        if (datesWithSlots.length === 1) {
+            return first;
+        }
+
+        const last = formatDateDisplay(datesWithSlots[datesWithSlots.length - 1]).split('（')[0];
+
+        // 同じ日付の場合も範囲表示しない
+        if (first === last) {
+            return first;
+        }
+
         return `${first}〜${last}`;
     }
 
