@@ -248,6 +248,9 @@
      */
     function renderShiftSection(existingShifts = []) {
         const weeks = getWeeks();
+        console.log('[renderShiftSection] 取得した週リスト:', weeks);
+        console.log('[renderShiftSection] カスタムシフト枠:', getCustomShiftSlots());
+
         const registeredWeeks = new Set(existingShifts.map(s => s.weekKey));
         const currentStaffId = elements.memberSelect.value;
         let html = '';
@@ -282,9 +285,11 @@
 
                 week.dates.forEach(dateStr => {
                     const opDate = getOperationDate(dateStr);
+                    console.log('[renderShiftSection] 日付:', dateStr, '営業情報:', opDate);
                     if (!opDate) return;
 
                     const slots = getAvailableSlots(dateStr);
+                    console.log('[renderShiftSection] 日付:', dateStr, 'シフト枠:', slots);
                     if (slots.length === 0) return;
 
                     html += `<div class="date-group">

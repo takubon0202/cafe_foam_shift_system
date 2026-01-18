@@ -776,7 +776,7 @@ function getOperationPeriod() {
 }
 
 /**
- * 週リストを取得（DEMO_MODE対応）
+ * 週リストを取得（DEMO_MODE対応・カスタムシフト枠対応）
  */
 function getWeeks() {
     if (CONFIG.DEMO_MODE) {
@@ -816,7 +816,73 @@ function getWeeks() {
 
         return weeks;
     }
-    return CONFIG.WEEKS;
+
+    // カスタムシフト枠を取得
+    const customSlots = getCustomShiftSlots();
+    console.log('[getWeeks] カスタムシフト枠:', customSlots);
+
+    if (!customSlots || Object.keys(customSlots).length === 0) {
+        console.log('[getWeeks] カスタムなし、CONFIG.WEEKSを返す');
+        return CONFIG.WEEKS;
+    }
+
+    // CONFIG.WEEKSをクローンして変更を加える
+    const weeks = JSON.parse(JSON.stringify(CONFIG.WEEKS));
+    console.log('[getWeeks] ベース週リスト:', weeks.map(w => w.weekKey));
+
+    // カスタムシフト枠の日付を適切な週に追加
+    Object.keys(customSlots).forEach(dateStr => {
+        // 空のスロット（削除された日付）はスキップ
+        if (!customSlots[dateStr] || customSlots[dateStr].length === 0) return;
+
+        // この日付が既に週に含まれているかチェック
+        let found = false;
+        for (const week of weeks) {
+            if (week.dates.includes(dateStr)) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            // この日付が属する週を計算
+            const date = parseDateStr(dateStr);
+            if (isNaN(date.getTime())) return;
+
+            const dayOfWeek = date.getDay();
+            const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            const monday = new Date(date);
+            monday.setDate(date.getDate() + diff);
+            const weekKey = formatDateStr(monday);
+
+            // 既存の週を検索または新規作成
+            let targetWeek = weeks.find(w => w.weekKey === weekKey);
+            if (!targetWeek) {
+                // 新しい週を作成
+                const month = monday.getMonth() + 1;
+                const day = monday.getDate();
+                targetWeek = {
+                    weekKey: weekKey,
+                    label: `${month}/${day}週`,
+                    dates: []
+                };
+                weeks.push(targetWeek);
+            }
+
+            // 日付を週に追加
+            if (!targetWeek.dates.includes(dateStr)) {
+                targetWeek.dates.push(dateStr);
+                targetWeek.dates.sort();
+                console.log('[getWeeks] 日付を追加:', dateStr, '→ 週:', targetWeek.weekKey);
+            }
+        }
+    });
+
+    // 週をweekKeyでソート
+    weeks.sort((a, b) => a.weekKey.localeCompare(b.weekKey));
+
+    console.log('[getWeeks] 最終週リスト:', weeks.map(w => ({ key: w.weekKey, dates: w.dates })));
+    return weeks;
 }
 
 /**
