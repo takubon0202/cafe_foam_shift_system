@@ -83,28 +83,9 @@ const CONFIG = {
 
     // 日付ごとのシフト枠定義（新構造）
     // 管理画面から動的に追加・編集可能
-    DATE_SHIFT_SLOTS: {
-        '2026-01-21': [
-            { id: 'SLOT_1', label: '枠1', start: '14:40', end: '16:10', requiredStaff: 3 },
-            { id: 'SLOT_2', label: '枠2', start: '16:10', end: '17:40', requiredStaff: 3 }
-        ],
-        '2026-01-22': [
-            { id: 'SLOT_1', label: '枠1', start: '14:40', end: '16:10', requiredStaff: 3 },
-            { id: 'SLOT_2', label: '枠2', start: '16:10', end: '17:40', requiredStaff: 3 }
-        ],
-        '2026-01-23': [
-            { id: 'SLOT_1', label: '枠1', start: '10:40', end: '12:10', requiredStaff: 3 },
-            { id: 'SLOT_2', label: '枠2', start: '12:10', end: '13:40', requiredStaff: 3 }
-        ],
-        '2026-01-26': [
-            { id: 'SLOT_1', label: '枠1', start: '14:40', end: '16:10', requiredStaff: 3 },
-            { id: 'SLOT_2', label: '枠2', start: '16:10', end: '17:40', requiredStaff: 3 }
-        ],
-        '2026-01-27': [
-            { id: 'SLOT_1', label: '枠1', start: '10:40', end: '12:10', requiredStaff: 3 },
-            { id: 'SLOT_2', label: '枠2', start: '12:10', end: '13:40', requiredStaff: 3 }
-        ]
-    },
+    // ※シフト枠はGASデータベースから取得されます
+    // ※CSVファイル「シフト枠設定_2026年1月.csv」からインポートしてください
+    DATE_SHIFT_SLOTS: {},
 
     // =======================================================================
     // 営業日・営業枠設定
