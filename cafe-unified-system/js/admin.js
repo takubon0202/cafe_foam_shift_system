@@ -49,6 +49,8 @@
         importPreview: document.getElementById('importPreview'),
         importPreviewContent: document.getElementById('importPreviewContent'),
         btnImportShifts: document.getElementById('btnImportShifts'),
+        // データベース移行
+        btnMigrateShiftConfig: document.getElementById('btnMigrateShiftConfig'),
         // スタッフ
         staffList: document.getElementById('staffList'),
         staffStatsBody: document.getElementById('staffStatsBody'),
@@ -148,6 +150,9 @@
         }
         if (elements.btnImportShifts) {
             elements.btnImportShifts.addEventListener('click', handleImportShifts);
+        }
+        if (elements.btnMigrateShiftConfig) {
+            elements.btnMigrateShiftConfig.addEventListener('click', handleMigrateShiftConfig);
         }
 
         // データ管理
@@ -1515,6 +1520,74 @@
         } catch (error) {
             console.error('[handleImportShifts] エラー:', error);
             Utils.showMessage('シフト枠のインポートに失敗しました: ' + error.message, 'error');
+        } finally {
+            Utils.showLoading(false);
+        }
+    }
+
+    /**
+     * デフォルトのシフト枠設定をデータベースに移行
+     */
+    async function handleMigrateShiftConfig() {
+        // CONFIG.DATE_SHIFT_SLOTSからデータを取得
+        const defaultSlots = CONFIG.DATE_SHIFT_SLOTS;
+
+        if (!defaultSlots || Object.keys(defaultSlots).length === 0) {
+            Utils.showMessage('移行するデフォルト設定がありません', 'error');
+            return;
+        }
+
+        // 移行するデータを配列形式に変換
+        const slotsToMigrate = [];
+        Object.keys(defaultSlots).forEach(dateStr => {
+            const slots = defaultSlots[dateStr];
+            if (slots && Array.isArray(slots)) {
+                slots.forEach(slot => {
+                    slotsToMigrate.push({
+                        date: dateStr,
+                        id: slot.id,
+                        label: slot.label,
+                        start: slot.start,
+                        end: slot.end,
+                        requiredStaff: slot.requiredStaff || 3
+                    });
+                });
+            }
+        });
+
+        if (slotsToMigrate.length === 0) {
+            Utils.showMessage('移行するシフト枠がありません', 'error');
+            return;
+        }
+
+        // 確認ダイアログ
+        const dateCount = Object.keys(defaultSlots).length;
+        if (!confirm(`${dateCount}日分、${slotsToMigrate.length}件のシフト枠をデータベースに移行します。\n\n移行する日付:\n${Object.keys(defaultSlots).join('\n')}\n\nよろしいですか？`)) {
+            return;
+        }
+
+        try {
+            Utils.showLoading(true, 'シフト枠設定を移行中...');
+
+            // GAS API経由でインポート
+            if (typeof importShiftSlotsToGAS === 'function') {
+                const result = await importShiftSlotsToGAS(slotsToMigrate);
+                if (result.success) {
+                    Utils.showMessage(`${result.count || slotsToMigrate.length}件のシフト枠をデータベースに移行しました`, 'success');
+                } else {
+                    throw new Error(result.error || '移行に失敗しました');
+                }
+            } else {
+                throw new Error('GAS連携機能が利用できません');
+            }
+
+            // 画面を更新
+            renderCurrentShiftConfig();
+            populateShiftDateSelect();
+
+        } catch (error) {
+            console.error('[handleMigrateShiftConfig] エラー:', error);
+            Utils.showMessage('シフト枠設定の移行に失敗しました: ' + error.message, 'error');
         } finally {
             Utils.showLoading(false);
         }
