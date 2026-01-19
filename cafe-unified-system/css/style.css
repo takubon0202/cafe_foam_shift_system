@@ -102,6 +102,57 @@ body {
     margin-top: var(--spacing-sm);
 }
 
+/* Database Connection Status */
+.db-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    border-radius: var(--radius-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.db-status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.db-status.status--connected {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+}
+
+.db-status.status--connected::before {
+    background-color: #4CAF50;
+}
+
+.db-status.status--disconnected {
+    background-color: #FFEBEE;
+    color: #C62828;
+}
+
+.db-status.status--disconnected::before {
+    background-color: #F44336;
+}
+
+.db-status.status--unknown {
+    background-color: #FFF3E0;
+    color: #E65100;
+}
+
+.db-status.status--unknown::before {
+    background-color: #FF9800;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
 /* Navigation */
 .nav {
     display: flex;

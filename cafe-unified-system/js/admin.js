@@ -75,11 +75,11 @@
         setupEventListeners();
         checkMigrationNeeded();
 
-        // GASからシフト枠設定を読み込み（非同期）
+        // GASからシフト枠設定を読み込み（強制リフレッシュ）
         if (typeof fetchShiftSlotConfig === 'function') {
             try {
                 Utils.showLoading(true, 'シフト枠設定を読み込み中...');
-                await fetchShiftSlotConfig();
+                await fetchShiftSlotConfig(true); // 強制リフレッシュでDBから最新を取得
                 console.log('[admin.init] シフト枠設定を読み込みました');
             } catch (error) {
                 console.warn('[admin.init] シフト枠設定の読み込みエラー:', error);

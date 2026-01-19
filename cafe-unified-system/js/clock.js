@@ -36,10 +36,10 @@
      * 初期化
      */
     async function init() {
-        // シフト枠設定をGASから読み込み
+        // シフト枠設定をGASから読み込み（強制リフレッシュ）
         if (typeof fetchShiftSlotConfig === 'function') {
             try {
-                await fetchShiftSlotConfig();
+                await fetchShiftSlotConfig(true); // 強制リフレッシュでDBから最新を取得
                 console.log('[clock:init] シフト枠設定読み込み完了');
             } catch (error) {
                 console.warn('[clock:init] シフト枠設定の読み込みエラー:', error);

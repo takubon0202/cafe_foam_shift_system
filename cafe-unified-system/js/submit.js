@@ -36,11 +36,11 @@
         populateMemberSelect();
         setupEventListeners();
 
-        // シフト枠設定をGASから読み込み（キャッシュ更新）
+        // シフト枠設定をGASから読み込み（強制リフレッシュ）
         if (typeof fetchShiftSlotConfig === 'function') {
             try {
                 console.log('[submit:init] シフト枠設定を読み込み中...');
-                await fetchShiftSlotConfig();
+                await fetchShiftSlotConfig(true); // 強制リフレッシュでDBから最新を取得
                 console.log('[submit:init] シフト枠設定読み込み完了');
             } catch (error) {
                 console.warn('[submit:init] シフト枠設定の読み込みエラー:', error);

@@ -511,6 +511,50 @@ function getDateShiftSlots(dateStr) {
 let _shiftSlotConfigCache = null;
 let _shiftSlotConfigLoading = false;
 let _shiftSlotConfigLoadPromise = null;
+let _databaseConnectionStatus = 'unknown'; // 'connected', 'disconnected', 'unknown'
+
+/**
+ * データベース接続状態を取得
+ */
+function getDatabaseConnectionStatus() {
+    return _databaseConnectionStatus;
+}
+
+/**
+ * データベース接続状態を設定
+ */
+function setDatabaseConnectionStatus(status) {
+    _databaseConnectionStatus = status;
+    // 接続状態表示を更新
+    updateConnectionStatusDisplay();
+}
+
+/**
+ * 接続状態表示を更新
+ */
+function updateConnectionStatusDisplay() {
+    const indicator = document.getElementById('dbConnectionStatus');
+    if (!indicator) return;
+
+    indicator.classList.remove('status--connected', 'status--disconnected', 'status--unknown');
+
+    switch (_databaseConnectionStatus) {
+        case 'connected':
+            indicator.classList.add('status--connected');
+            indicator.textContent = 'DB接続中';
+            indicator.title = 'スプレッドシートデータベースに接続されています';
+            break;
+        case 'disconnected':
+            indicator.classList.add('status--disconnected');
+            indicator.textContent = 'DB未接続';
+            indicator.title = 'データベース接続に失敗しました。ローカルデータを使用中';
+            break;
+        default:
+            indicator.classList.add('status--unknown');
+            indicator.textContent = 'DB確認中...';
+            indicator.title = 'データベース接続を確認中...';
+    }
+}
 
 /**
  * シフト枠設定を取得（GAS優先、ローカル併用）
@@ -534,9 +578,17 @@ function getCustomShiftSlots() {
 
 /**
  * シフト枠設定をGASから取得してキャッシュに保存
+ * @param {boolean} forceRefresh - trueの場合、ローカルキャッシュをクリアして再取得
  * @returns {Promise<Object>} シフト枠設定
  */
-async function fetchShiftSlotConfig() {
+async function fetchShiftSlotConfig(forceRefresh = false) {
+    // 強制リフレッシュの場合、キャッシュとローカルストレージをクリア
+    if (forceRefresh) {
+        _shiftSlotConfigCache = null;
+        localStorage.removeItem('cafe_custom_shift_slots');
+        console.log('[fetchShiftSlotConfig] キャッシュをクリア（強制リフレッシュ）');
+    }
+
     // 既に読み込み中の場合は、その Promise を返す
     if (_shiftSlotConfigLoading && _shiftSlotConfigLoadPromise) {
         return _shiftSlotConfigLoadPromise;
@@ -545,10 +597,12 @@ async function fetchShiftSlotConfig() {
     // GAS URLが設定されていない場合はローカルから取得
     if (!isConfigValid()) {
         console.log('[fetchShiftSlotConfig] GAS未設定、ローカルから取得');
+        setDatabaseConnectionStatus('disconnected');
         return getCustomShiftSlots();
     }
 
     _shiftSlotConfigLoading = true;
+    setDatabaseConnectionStatus('unknown');
 
     _shiftSlotConfigLoadPromise = new Promise(async (resolve) => {
         try {
@@ -564,20 +618,24 @@ async function fetchShiftSlotConfig() {
 
             const result = await response.json();
 
-            if (result.success && result.slots) {
-                _shiftSlotConfigCache = result.slots;
+            if (result.success) {
+                const slots = result.slots || {};
+                _shiftSlotConfigCache = slots;
                 // ローカルストレージにも保存（オフライン対応）
-                saveCustomShiftSlotsLocal(result.slots);
-                console.log('[fetchShiftSlotConfig] GASから取得成功:', Object.keys(result.slots).length, '日分');
-                resolve(result.slots);
+                saveCustomShiftSlotsLocal(slots);
+                setDatabaseConnectionStatus('connected');
+                console.log('[fetchShiftSlotConfig] GASから取得成功:', Object.keys(slots).length, '日分');
+                resolve(slots);
             } else {
-                console.warn('[fetchShiftSlotConfig] GASから空のデータ:', result);
-                resolve(getCustomShiftSlots());
+                console.warn('[fetchShiftSlotConfig] GASからエラー:', result);
+                setDatabaseConnectionStatus('disconnected');
+                resolve(getCustomShiftSlots() || {});
             }
         } catch (error) {
             console.error('[fetchShiftSlotConfig] GAS取得エラー:', error);
+            setDatabaseConnectionStatus('disconnected');
             // エラー時はローカルから取得
-            resolve(getCustomShiftSlots());
+            resolve(getCustomShiftSlots() || {});
         } finally {
             _shiftSlotConfigLoading = false;
             _shiftSlotConfigLoadPromise = null;
