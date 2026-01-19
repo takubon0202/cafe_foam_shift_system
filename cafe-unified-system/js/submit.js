@@ -263,6 +263,18 @@
         console.log('[renderShiftSection] 取得した週リスト:', weeks);
         console.log('[renderShiftSection] カスタムシフト枠:', getCustomShiftSlots());
 
+        // シフト枠が登録されていない場合
+        if (weeks.length === 0) {
+            elements.shiftSection.innerHTML = `
+                <section class="card">
+                    <h2 class="card__title">シフト枠未登録</h2>
+                    <p class="card__note">現在、シフト枠が登録されていません。</p>
+                    <p class="card__note">管理画面からシフト枠を登録してください。</p>
+                </section>
+            `;
+            return;
+        }
+
         const registeredWeeks = new Set(existingShifts.map(s => s.weekKey));
         const currentStaffId = elements.memberSelect.value;
         let html = '';

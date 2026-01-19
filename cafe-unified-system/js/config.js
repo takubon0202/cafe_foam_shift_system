@@ -30,20 +30,22 @@ const CONFIG = {
     CAFE_NAME: '共創カフェ',
 
     // 営業期間
+    // ※シフト枠はGASデータベースから取得されます
+    // ※期間はシフト枠の日付から動的に計算されます
     OPERATION_PERIOD: {
-        // プレオープン期間
+        // プレオープン期間（参考値）
         preopen: {
-            start: '2026-01-21',
-            end: '2026-01-27'
+            start: null,
+            end: null
         },
-        // グランドオープン期間
+        // グランドオープン期間（参考値）
         grandopen: {
-            start: '2026-04-06',
-            end: '2026-04-30'
+            start: null,
+            end: null
         },
-        // 現在のアクティブ期間
-        start: '2026-01-21',
-        end: '2026-01-27'
+        // 現在のアクティブ期間（データベースから動的に取得）
+        start: null,
+        end: null
     },
 
     // 特別日
@@ -91,45 +93,23 @@ const CONFIG = {
     // 営業日・営業枠設定
     // =======================================================================
 
-    // 営業日リスト（2026年1月）
-    OPERATION_DATES: [
-        // 1/19週
-        { date: '2026-01-21', weekday: 3, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-22', weekday: 4, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-23', weekday: 5, hasMorning: true, hasAfternoon: false },
-        // 1/26週
-        { date: '2026-01-26', weekday: 1, hasMorning: false, hasAfternoon: true },
-        { date: '2026-01-27', weekday: 2, hasMorning: true, hasAfternoon: false }
-    ],
+    // 営業日リスト
+    // ※シフト枠はGASデータベースから取得されます
+    // ※CSVファイル「シフト枠設定_2026年1月.csv」からインポートしてください
+    OPERATION_DATES: [],
 
     // 日付ごとの営業枠ID設定
-    DATE_SLOTS: {
-        '2026-01-21': ['SLOT_1', 'SLOT_2'],
-        '2026-01-22': ['SLOT_1', 'SLOT_2'],
-        '2026-01-23': ['SLOT_1', 'SLOT_2'],
-        '2026-01-26': ['SLOT_1', 'SLOT_2'],
-        '2026-01-27': ['SLOT_1', 'SLOT_2']
-    },
+    // ※シフト枠はGASデータベースから取得されます
+    DATE_SLOTS: {},
 
     // =======================================================================
     // 週定義（週1制約用）
     // =======================================================================
 
     // 週の定義（weekKey = その週の月曜日の日付）
-    WEEKS: [
-        {
-            weekKey: '2026-01-19',
-            label: '1/19週',
-            description: '1月第3週',
-            dates: ['2026-01-21', '2026-01-22', '2026-01-23']
-        },
-        {
-            weekKey: '2026-01-26',
-            label: '1/26週',
-            description: '1月第4週',
-            dates: ['2026-01-26', '2026-01-27']
-        }
-    ],
+    // ※シフト枠はGASデータベースから取得されます
+    // ※週情報はシフト枠の日付から動的に生成されます
+    WEEKS: [],
 
     // 週1制約（1週間に登録できるシフト数）
     WEEKLY_SHIFT_LIMIT: 1,
@@ -1053,7 +1033,7 @@ function getOperationDates() {
 }
 
 /**
- * 営業期間を取得（カスタムシフト枠も考慮して動的に拡張）
+ * 営業期間を取得（データベースのシフト枠から動的に計算）
  */
 function getOperationPeriod() {
     if (CONFIG.DEMO_MODE) {
@@ -1066,18 +1046,18 @@ function getOperationPeriod() {
         };
     }
 
-    // 基本の営業期間
-    let start = CONFIG.OPERATION_PERIOD.start;
-    let end = CONFIG.OPERATION_PERIOD.end;
+    // データベースのシフト枠から期間を計算
+    let start = null;
+    let end = null;
 
-    // カスタムシフト枠の日付も考慮して期間を拡張
+    // カスタムシフト枠（データベース）から期間を取得
     const customSlots = getCustomShiftSlots();
     if (customSlots) {
         Object.keys(customSlots).forEach(dateStr => {
             // 空配列の日付はスキップ（削除された日付）
             if (customSlots[dateStr] && customSlots[dateStr].length > 0) {
-                if (dateStr < start) start = dateStr;
-                if (dateStr > end) end = dateStr;
+                if (!start || dateStr < start) start = dateStr;
+                if (!end || dateStr > end) end = dateStr;
             }
         });
     }
