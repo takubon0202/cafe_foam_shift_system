@@ -789,6 +789,9 @@ async function deleteShiftSlotFromGAS(dateStr, slotId) {
  * @returns {Promise<Object>} 結果
  */
 async function importShiftSlotsToGAS(slots) {
+    console.log('[importShiftSlotsToGAS] 開始:', slots.length, '件のシフト枠');
+    console.log('[importShiftSlotsToGAS] データ:', JSON.stringify(slots, null, 2));
+
     if (!isConfigValid()) {
         console.warn('[importShiftSlotsToGAS] GAS未設定、ローカルのみに保存');
         // ローカルのみに保存
@@ -813,27 +816,56 @@ async function importShiftSlotsToGAS(slots) {
 
     try {
         const url = getGasUrl();
+        console.log('[importShiftSlotsToGAS] GAS URL:', url);
+
+        const requestBody = JSON.stringify({
+            action: 'importShiftSlots',
+            slots: slots
+        });
+        console.log('[importShiftSlotsToGAS] リクエストボディ:', requestBody);
+
+        // GASへのリクエスト（リダイレクトを許可）
         const response = await fetch(url, {
             method: 'POST',
             mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'importShiftSlots',
-                slots: slots
-            })
+            redirect: 'follow',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: requestBody
         });
 
-        const result = await response.json();
+        console.log('[importShiftSlotsToGAS] レスポンスステータス:', response.status);
+        console.log('[importShiftSlotsToGAS] レスポンスOK:', response.ok);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const responseText = await response.text();
+        console.log('[importShiftSlotsToGAS] レスポンステキスト:', responseText);
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('[importShiftSlotsToGAS] JSONパースエラー:', parseError);
+            throw new Error('サーバーからの応答を解析できませんでした');
+        }
+
+        console.log('[importShiftSlotsToGAS] 結果:', result);
 
         if (result.success) {
             // キャッシュをリフレッシュ
             clearShiftSlotConfigCache();
-            await fetchShiftSlotConfig();
+            await fetchShiftSlotConfig(true);
+            setDatabaseConnectionStatus('connected');
         }
 
         return result;
     } catch (error) {
         console.error('[importShiftSlotsToGAS] エラー:', error);
+        setDatabaseConnectionStatus('disconnected');
         return { success: false, error: error.message };
     }
 }

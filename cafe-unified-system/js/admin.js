@@ -1470,6 +1470,9 @@
      * シフト枠を一括インポート
      */
     async function handleImportShifts() {
+        console.log('[handleImportShifts] 開始');
+        console.log('[handleImportShifts] pendingImportData:', pendingImportData);
+
         if (pendingImportData.length === 0) {
             Utils.showMessage('インポートするデータがありません', 'error');
             return;
@@ -1484,13 +1487,17 @@
 
             // GAS API経由でインポート
             if (typeof importShiftSlotsToGAS === 'function') {
+                console.log('[handleImportShifts] importShiftSlotsToGAS関数を使用');
                 const result = await importShiftSlotsToGAS(pendingImportData);
+                console.log('[handleImportShifts] 結果:', result);
+
                 if (result.success) {
                     Utils.showMessage(`${result.count || pendingImportData.length}件のシフト枠を登録しました`, 'success');
                 } else {
                     throw new Error(result.error || 'インポートに失敗しました');
                 }
             } else {
+                console.log('[handleImportShifts] ローカルフォールバックを使用');
                 // フォールバック: ローカルのみ
                 let addedCount = 0;
 
@@ -1514,8 +1521,10 @@
             resetImportState();
 
             // 画面を更新
-            renderCurrentShiftConfig();
+            console.log('[handleImportShifts] 画面を更新中...');
+            await renderCurrentShiftConfig();
             populateShiftDateSelect();
+            console.log('[handleImportShifts] 完了');
 
         } catch (error) {
             console.error('[handleImportShifts] エラー:', error);
