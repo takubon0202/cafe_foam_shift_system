@@ -36,6 +36,16 @@
         try {
             Utils.showLoading(true, 'データを読み込み中...');
 
+            // シフト枠設定をGASから読み込み
+            if (typeof fetchShiftSlotConfig === 'function') {
+                try {
+                    await fetchShiftSlotConfig();
+                    console.log('[calendar:init] シフト枠設定読み込み完了');
+                } catch (error) {
+                    console.warn('[calendar:init] シフト枠設定の読み込みエラー:', error);
+                }
+            }
+
             // 営業期間の最初の月を表示月として設定
             const period = getOperationPeriod();
             console.log('[calendar:init] 営業期間:', period);

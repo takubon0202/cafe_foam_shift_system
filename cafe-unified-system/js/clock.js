@@ -35,7 +35,17 @@
     /**
      * 初期化
      */
-    function init() {
+    async function init() {
+        // シフト枠設定をGASから読み込み
+        if (typeof fetchShiftSlotConfig === 'function') {
+            try {
+                await fetchShiftSlotConfig();
+                console.log('[clock:init] シフト枠設定読み込み完了');
+            } catch (error) {
+                console.warn('[clock:init] シフト枠設定の読み込みエラー:', error);
+            }
+        }
+
         updateDateTime();
         setInterval(updateDateTime, 1000);
         populateStaffSelect();

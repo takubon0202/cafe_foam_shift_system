@@ -15,6 +15,7 @@
 // シート名
 const SHEET_SHIFTS = 'シフト提出';
 const SHEET_CLOCK = '打刻履歴';
+const SHEET_SLOT_CONFIG = 'シフト枠設定';
 
 // シフト枠定義
 const SHIFT_SLOTS = {
@@ -124,6 +125,26 @@ function getClockSheet() {
 }
 
 /**
+ * シフト枠設定シートを取得または作成
+ */
+function getSlotConfigSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_SLOT_CONFIG);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_SLOT_CONFIG);
+    const headers = [
+      'ID', '日付', '枠ID', '枠名', '開始時刻', '終了時刻', '必要人数', '作成日時', '更新日時'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+
+  return sheet;
+}
+
+/**
  * POSTリクエストを処理
  */
 function doPost(e) {
@@ -162,6 +183,18 @@ function doPost(e) {
       case 'getStats':
         result = handleGetStats();
         break;
+      case 'getShiftSlotConfig':
+        result = handleGetShiftSlotConfig();
+        break;
+      case 'saveShiftSlot':
+        result = handleSaveShiftSlot(data);
+        break;
+      case 'deleteShiftSlotConfig':
+        result = handleDeleteShiftSlotConfig(data);
+        break;
+      case 'importShiftSlots':
+        result = handleImportShiftSlots(data.slots);
+        break;
       default:
         result = { success: false, error: 'Unknown action' };
     }
@@ -199,12 +232,15 @@ function doGet(e) {
       case 'getStats':
         result = handleGetStats();
         break;
+      case 'getShiftSlotConfig':
+        result = handleGetShiftSlotConfig();
+        break;
       case 'status':
       default:
         result = {
           success: true,
           message: 'Cafe Unified System API',
-          version: '1.0'
+          version: '1.1'
         };
     }
 
@@ -668,6 +704,188 @@ function handleGetStats() {
   };
 }
 
+// =======================================================================
+// シフト枠設定管理
+// =======================================================================
+
+/**
+ * シフト枠設定を取得
+ */
+function handleGetShiftSlotConfig() {
+  const sheet = getSlotConfigSheet();
+  const data = sheet.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    return { success: true, slots: {} };
+  }
+
+  const rows = data.slice(1);
+  const slotsByDate = {};
+
+  rows.forEach(row => {
+    const dateStr = normalizeDate(row[1]);
+    if (!dateStr) return;
+
+    if (!slotsByDate[dateStr]) {
+      slotsByDate[dateStr] = [];
+    }
+
+    slotsByDate[dateStr].push({
+      id: String(row[2] || ''),
+      label: String(row[3] || ''),
+      start: String(row[4] || ''),
+      end: String(row[5] || ''),
+      requiredStaff: parseInt(row[6]) || 3
+    });
+  });
+
+  return { success: true, slots: slotsByDate };
+}
+
+/**
+ * シフト枠を保存（追加または更新）
+ */
+function handleSaveShiftSlot(data) {
+  const { dateStr, slot } = data;
+
+  if (!dateStr || !slot) {
+    return { success: false, error: '日付とシフト枠データが必要です' };
+  }
+
+  if (!slot.start || !slot.end) {
+    return { success: false, error: '開始時刻と終了時刻が必要です' };
+  }
+
+  const sheet = getSlotConfigSheet();
+  const sheetData = sheet.getDataRange().getValues();
+  const rows = sheetData.slice(1);
+
+  // 既存のレコードを検索
+  let existingRowIndex = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const rowDate = normalizeDate(rows[i][1]);
+    const rowSlotId = String(rows[i][2] || '');
+    if (rowDate === dateStr && rowSlotId === slot.id) {
+      existingRowIndex = i + 2; // ヘッダー行分を考慮
+      break;
+    }
+  }
+
+  const now = new Date().toISOString();
+
+  if (existingRowIndex > 0) {
+    // 更新
+    sheet.getRange(existingRowIndex, 4, 1, 5).setValues([[
+      slot.label,
+      slot.start,
+      slot.end,
+      slot.requiredStaff || 3,
+      now
+    ]]);
+  } else {
+    // 新規追加
+    const id = Utilities.getUuid();
+    const slotId = slot.id || `SLOT_${Date.now()}`;
+    sheet.appendRow([
+      id,
+      "'" + dateStr,
+      slotId,
+      slot.label || '',
+      slot.start,
+      slot.end,
+      slot.requiredStaff || 3,
+      now,
+      now
+    ]);
+
+    slot.id = slotId;
+  }
+
+  return {
+    success: true,
+    slot: slot,
+    message: 'シフト枠を保存しました'
+  };
+}
+
+/**
+ * シフト枠設定を削除
+ */
+function handleDeleteShiftSlotConfig(data) {
+  const { dateStr, slotId } = data;
+
+  if (!dateStr) {
+    return { success: false, error: '日付が指定されていません' };
+  }
+
+  const sheet = getSlotConfigSheet();
+  const sheetData = sheet.getDataRange().getValues();
+
+  const rowsToDelete = [];
+  for (let i = sheetData.length - 1; i >= 1; i--) {
+    const rowDate = normalizeDate(sheetData[i][1]);
+    const rowSlotId = String(sheetData[i][2] || '');
+
+    if (rowDate === dateStr) {
+      // slotIdが指定されている場合はそのIDのみ、指定されていない場合は全て削除
+      if (!slotId || rowSlotId === slotId) {
+        rowsToDelete.push(i + 1);
+      }
+    }
+  }
+
+  rowsToDelete.forEach(rowNum => {
+    sheet.deleteRow(rowNum);
+  });
+
+  return {
+    success: true,
+    deletedCount: rowsToDelete.length,
+    message: `${rowsToDelete.length}件のシフト枠を削除しました`
+  };
+}
+
+/**
+ * シフト枠を一括インポート
+ */
+function handleImportShiftSlots(slots) {
+  if (!slots || !Array.isArray(slots) || slots.length === 0) {
+    return { success: false, error: 'インポートするデータがありません' };
+  }
+
+  const sheet = getSlotConfigSheet();
+  const now = new Date().toISOString();
+  let addedCount = 0;
+
+  slots.forEach(slotData => {
+    const dateStr = slotData.date;
+    if (!dateStr || !slotData.start || !slotData.end) return;
+
+    const id = Utilities.getUuid();
+    const slotId = slotData.id || `SLOT_${Date.now()}_${addedCount}`;
+
+    sheet.appendRow([
+      id,
+      "'" + dateStr,
+      slotId,
+      slotData.label || '',
+      slotData.start,
+      slotData.end,
+      slotData.requiredStaff || 3,
+      now,
+      now
+    ]);
+
+    addedCount++;
+  });
+
+  return {
+    success: true,
+    count: addedCount,
+    message: `${addedCount}件のシフト枠をインポートしました`
+  };
+}
+
 /**
  * CORSに対応したレスポンスを作成
  */
@@ -683,7 +901,8 @@ function createResponse(data) {
 function initializeSheets() {
   getShiftSheet();
   getClockSheet();
-  Logger.log('シートを初期化しました');
+  getSlotConfigSheet();
+  Logger.log('シートを初期化しました（シフト枠設定シートを含む）');
 }
 
 /**

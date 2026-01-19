@@ -68,10 +68,23 @@
     /**
      * 初期化
      */
-    function init() {
+    async function init() {
         checkAuth();
         setupEventListeners();
         checkMigrationNeeded();
+
+        // GASからシフト枠設定を読み込み（非同期）
+        if (typeof fetchShiftSlotConfig === 'function') {
+            try {
+                Utils.showLoading(true, 'シフト枠設定を読み込み中...');
+                await fetchShiftSlotConfig();
+                console.log('[admin.init] シフト枠設定を読み込みました');
+            } catch (error) {
+                console.warn('[admin.init] シフト枠設定の読み込みエラー:', error);
+            } finally {
+                Utils.showLoading(false);
+            }
+        }
     }
 
     /**
@@ -714,7 +727,7 @@
     /**
      * シフト枠を削除
      */
-    function handleDeleteShiftSlot(dateStr, slotId, slotLabel) {
+    async function handleDeleteShiftSlot(dateStr, slotId, slotLabel) {
         console.log('[handleDeleteShiftSlot] 削除リクエスト:', { dateStr, slotId, slotLabel });
 
         const d = parseDateStr(dateStr);
@@ -725,15 +738,36 @@
             return;
         }
 
-        removeShiftSlotCompletely(dateStr, slotId);
-        console.log('[handleDeleteShiftSlot] 削除完了:', dateStr, slotId);
+        try {
+            Utils.showLoading(true, 'シフト枠を削除中...');
 
-        Utils.showMessage(`${dateLabel}の${slotLabel}を削除しました`, 'success');
-        renderCurrentShiftConfig();
-        populateShiftDateSelect();
+            // GAS API経由で削除
+            if (typeof deleteShiftSlotFromGAS === 'function') {
+                const result = await deleteShiftSlotFromGAS(dateStr, slotId);
+                if (result.success) {
+                    console.log('[handleDeleteShiftSlot] GAS削除完了:', dateStr, slotId);
+                } else {
+                    throw new Error(result.error || '削除に失敗しました');
+                }
+            } else {
+                // フォールバック: ローカルのみ
+                removeShiftSlotCompletely(dateStr, slotId);
+                console.log('[handleDeleteShiftSlot] ローカル削除完了:', dateStr, slotId);
+            }
+
+            Utils.showMessage(`${dateLabel}の${slotLabel}を削除しました`, 'success');
+            renderCurrentShiftConfig();
+            populateShiftDateSelect();
+
+        } catch (error) {
+            console.error('[handleDeleteShiftSlot] エラー:', error);
+            Utils.showMessage('シフト枠の削除に失敗しました: ' + error.message, 'error');
+        } finally {
+            Utils.showLoading(false);
+        }
     }
 
-    function handleAddShiftSlot() {
+    async function handleAddShiftSlot() {
         const dateStr = elements.newShiftDate?.value;
         const label = elements.newShiftLabel?.value || '';
         const start = elements.newShiftStart?.value;
@@ -753,20 +787,44 @@
             return;
         }
 
-        const newSlot = addShiftSlot(dateStr, {
+        // 新しいスロットデータを作成
+        const slotData = {
             label: label,
             start: start,
             end: end,
             requiredStaff: requiredStaff
-        });
+        };
 
-        if (newSlot) {
-            Utils.showMessage(`${dateStr}に${newSlot.label}（${start}〜${end}）を追加しました`, 'success');
+        try {
+            Utils.showLoading(true, 'シフト枠を登録中...');
+
+            // GAS API経由で保存
+            if (typeof saveShiftSlotToGAS === 'function') {
+                const result = await saveShiftSlotToGAS(dateStr, slotData);
+                if (result.success) {
+                    Utils.showMessage(`${dateStr}に${result.slot?.label || label}（${start}〜${end}）を追加しました`, 'success');
+                } else {
+                    throw new Error(result.error || '保存に失敗しました');
+                }
+            } else {
+                // フォールバック: ローカルのみ
+                const newSlot = addShiftSlot(dateStr, slotData);
+                if (newSlot) {
+                    Utils.showMessage(`${dateStr}に${newSlot.label}（${start}〜${end}）を追加しました`, 'success');
+                }
+            }
+
             renderCurrentShiftConfig();
             populateShiftDateSelect();
 
             // フォームをリセット
             if (elements.newShiftLabel) elements.newShiftLabel.value = '';
+
+        } catch (error) {
+            console.error('[handleAddShiftSlot] エラー:', error);
+            Utils.showMessage('シフト枠の登録に失敗しました: ' + error.message, 'error');
+        } finally {
+            Utils.showLoading(false);
         }
     }
 
@@ -1406,7 +1464,7 @@
     /**
      * シフト枠を一括インポート
      */
-    function handleImportShifts() {
+    async function handleImportShifts() {
         if (pendingImportData.length === 0) {
             Utils.showMessage('インポートするデータがありません', 'error');
             return;
@@ -1416,29 +1474,50 @@
             return;
         }
 
-        let addedCount = 0;
+        try {
+            Utils.showLoading(true, 'シフト枠をインポート中...');
 
-        pendingImportData.forEach(row => {
-            const newSlot = addShiftSlot(row.date, {
-                label: row.label,
-                start: row.start,
-                end: row.end,
-                requiredStaff: row.requiredStaff
-            });
+            // GAS API経由でインポート
+            if (typeof importShiftSlotsToGAS === 'function') {
+                const result = await importShiftSlotsToGAS(pendingImportData);
+                if (result.success) {
+                    Utils.showMessage(`${result.count || pendingImportData.length}件のシフト枠を登録しました`, 'success');
+                } else {
+                    throw new Error(result.error || 'インポートに失敗しました');
+                }
+            } else {
+                // フォールバック: ローカルのみ
+                let addedCount = 0;
 
-            if (newSlot) {
-                addedCount++;
+                pendingImportData.forEach(row => {
+                    const newSlot = addShiftSlot(row.date, {
+                        label: row.label,
+                        start: row.start,
+                        end: row.end,
+                        requiredStaff: row.requiredStaff
+                    });
+
+                    if (newSlot) {
+                        addedCount++;
+                    }
+                });
+
+                Utils.showMessage(`${addedCount}件のシフト枠を登録しました`, 'success');
             }
-        });
 
-        Utils.showMessage(`${addedCount}件のシフト枠を登録しました`, 'success');
+            // 状態をリセット
+            resetImportState();
 
-        // 状態をリセット
-        resetImportState();
+            // 画面を更新
+            renderCurrentShiftConfig();
+            populateShiftDateSelect();
 
-        // 画面を更新
-        renderCurrentShiftConfig();
-        populateShiftDateSelect();
+        } catch (error) {
+            console.error('[handleImportShifts] エラー:', error);
+            Utils.showMessage('シフト枠のインポートに失敗しました: ' + error.message, 'error');
+        } finally {
+            Utils.showLoading(false);
+        }
     }
 
     // 初期化

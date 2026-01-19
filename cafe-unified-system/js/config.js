@@ -522,10 +522,26 @@ function getDateShiftSlots(dateStr) {
     return defaultSlots;
 }
 
+// =======================================================================
+// シフト枠設定のキャッシュ管理
+// =======================================================================
+
+// グローバルキャッシュ変数
+let _shiftSlotConfigCache = null;
+let _shiftSlotConfigLoading = false;
+let _shiftSlotConfigLoadPromise = null;
+
 /**
- * ローカルストレージからカスタムシフト設定を取得
+ * シフト枠設定を取得（GAS優先、ローカル併用）
+ * キャッシュがあればキャッシュを返す
  */
 function getCustomShiftSlots() {
+    // キャッシュがあれば返す
+    if (_shiftSlotConfigCache !== null) {
+        return _shiftSlotConfigCache;
+    }
+
+    // ローカルストレージから取得（フォールバック）
     try {
         const stored = localStorage.getItem('cafe_custom_shift_slots');
         return stored ? JSON.parse(stored) : null;
@@ -536,15 +552,270 @@ function getCustomShiftSlots() {
 }
 
 /**
- * カスタムシフト設定をローカルストレージに保存
+ * シフト枠設定をGASから取得してキャッシュに保存
+ * @returns {Promise<Object>} シフト枠設定
  */
-function saveCustomShiftSlots(slots) {
+async function fetchShiftSlotConfig() {
+    // 既に読み込み中の場合は、その Promise を返す
+    if (_shiftSlotConfigLoading && _shiftSlotConfigLoadPromise) {
+        return _shiftSlotConfigLoadPromise;
+    }
+
+    // GAS URLが設定されていない場合はローカルから取得
+    if (!isConfigValid()) {
+        console.log('[fetchShiftSlotConfig] GAS未設定、ローカルから取得');
+        return getCustomShiftSlots();
+    }
+
+    _shiftSlotConfigLoading = true;
+
+    _shiftSlotConfigLoadPromise = new Promise(async (resolve) => {
+        try {
+            const url = getGasUrl();
+            const response = await fetch(`${url}?action=getShiftSlotConfig`, {
+                method: 'GET',
+                mode: 'cors'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.slots) {
+                _shiftSlotConfigCache = result.slots;
+                // ローカルストレージにも保存（オフライン対応）
+                saveCustomShiftSlotsLocal(result.slots);
+                console.log('[fetchShiftSlotConfig] GASから取得成功:', Object.keys(result.slots).length, '日分');
+                resolve(result.slots);
+            } else {
+                console.warn('[fetchShiftSlotConfig] GASから空のデータ:', result);
+                resolve(getCustomShiftSlots());
+            }
+        } catch (error) {
+            console.error('[fetchShiftSlotConfig] GAS取得エラー:', error);
+            // エラー時はローカルから取得
+            resolve(getCustomShiftSlots());
+        } finally {
+            _shiftSlotConfigLoading = false;
+            _shiftSlotConfigLoadPromise = null;
+        }
+    });
+
+    return _shiftSlotConfigLoadPromise;
+}
+
+/**
+ * シフト枠設定キャッシュをクリア
+ */
+function clearShiftSlotConfigCache() {
+    _shiftSlotConfigCache = null;
+    console.log('[clearShiftSlotConfigCache] キャッシュをクリア');
+}
+
+/**
+ * シフト枠設定キャッシュを更新
+ */
+function updateShiftSlotConfigCache(slots) {
+    _shiftSlotConfigCache = slots;
+    saveCustomShiftSlotsLocal(slots);
+}
+
+/**
+ * カスタムシフト設定をローカルストレージに保存（内部用）
+ */
+function saveCustomShiftSlotsLocal(slots) {
     try {
         localStorage.setItem('cafe_custom_shift_slots', JSON.stringify(slots));
         return true;
     } catch (e) {
-        console.error('[saveCustomShiftSlots] エラー:', e);
+        console.error('[saveCustomShiftSlotsLocal] エラー:', e);
         return false;
+    }
+}
+
+/**
+ * カスタムシフト設定をローカルストレージに保存
+ * @deprecated GAS連携後は saveShiftSlotToGAS を使用
+ */
+function saveCustomShiftSlots(slots) {
+    _shiftSlotConfigCache = slots;
+    return saveCustomShiftSlotsLocal(slots);
+}
+
+/**
+ * シフト枠をGASに保存
+ * @param {string} dateStr - 日付 (YYYY-MM-DD)
+ * @param {Object} slot - シフト枠データ
+ * @returns {Promise<Object>} 結果
+ */
+async function saveShiftSlotToGAS(dateStr, slot) {
+    if (!isConfigValid()) {
+        console.warn('[saveShiftSlotToGAS] GAS未設定、ローカルのみに保存');
+        // ローカルのみに保存
+        const customSlots = getCustomShiftSlots() || {};
+        if (!customSlots[dateStr]) {
+            customSlots[dateStr] = [];
+        }
+        customSlots[dateStr].push(slot);
+        saveCustomShiftSlots(customSlots);
+        return { success: true, slot: slot };
+    }
+
+    try {
+        const url = getGasUrl();
+        const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'saveShiftSlot',
+                dateStr: dateStr,
+                slot: slot
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // キャッシュを更新
+            const customSlots = getCustomShiftSlots() || {};
+            if (!customSlots[dateStr]) {
+                customSlots[dateStr] = [];
+            }
+            // 既存のスロットを検索して更新または追加
+            const existingIndex = customSlots[dateStr].findIndex(s => s.id === result.slot.id);
+            if (existingIndex >= 0) {
+                customSlots[dateStr][existingIndex] = result.slot;
+            } else {
+                customSlots[dateStr].push(result.slot);
+            }
+            updateShiftSlotConfigCache(customSlots);
+        }
+
+        return result;
+    } catch (error) {
+        console.error('[saveShiftSlotToGAS] エラー:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * シフト枠をGASから削除
+ * @param {string} dateStr - 日付 (YYYY-MM-DD)
+ * @param {string} slotId - シフト枠ID（省略時は日付の全シフト枠を削除）
+ * @returns {Promise<Object>} 結果
+ */
+async function deleteShiftSlotFromGAS(dateStr, slotId) {
+    if (!isConfigValid()) {
+        console.warn('[deleteShiftSlotFromGAS] GAS未設定、ローカルのみ削除');
+        // ローカルのみ削除
+        const customSlots = getCustomShiftSlots() || {};
+        if (customSlots[dateStr]) {
+            if (slotId) {
+                customSlots[dateStr] = customSlots[dateStr].filter(s => s.id !== slotId);
+                if (customSlots[dateStr].length === 0) {
+                    customSlots[dateStr] = [];
+                }
+            } else {
+                customSlots[dateStr] = [];
+            }
+            saveCustomShiftSlots(customSlots);
+        }
+        return { success: true };
+    }
+
+    try {
+        const url = getGasUrl();
+        const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'deleteShiftSlotConfig',
+                dateStr: dateStr,
+                slotId: slotId
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // キャッシュを更新
+            const customSlots = getCustomShiftSlots() || {};
+            if (customSlots[dateStr]) {
+                if (slotId) {
+                    customSlots[dateStr] = customSlots[dateStr].filter(s => s.id !== slotId);
+                    if (customSlots[dateStr].length === 0) {
+                        customSlots[dateStr] = [];
+                    }
+                } else {
+                    customSlots[dateStr] = [];
+                }
+                updateShiftSlotConfigCache(customSlots);
+            }
+        }
+
+        return result;
+    } catch (error) {
+        console.error('[deleteShiftSlotFromGAS] エラー:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * シフト枠を一括インポート（GAS）
+ * @param {Array} slots - シフト枠データの配列
+ * @returns {Promise<Object>} 結果
+ */
+async function importShiftSlotsToGAS(slots) {
+    if (!isConfigValid()) {
+        console.warn('[importShiftSlotsToGAS] GAS未設定、ローカルのみに保存');
+        // ローカルのみに保存
+        const customSlots = getCustomShiftSlots() || {};
+        slots.forEach(slotData => {
+            const dateStr = slotData.date;
+            if (!customSlots[dateStr]) {
+                customSlots[dateStr] = [];
+            }
+            const newSlot = {
+                id: `SLOT_${Date.now()}_${customSlots[dateStr].length}`,
+                label: slotData.label || '',
+                start: slotData.start,
+                end: slotData.end,
+                requiredStaff: slotData.requiredStaff || 3
+            };
+            customSlots[dateStr].push(newSlot);
+        });
+        saveCustomShiftSlots(customSlots);
+        return { success: true, count: slots.length };
+    }
+
+    try {
+        const url = getGasUrl();
+        const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'importShiftSlots',
+                slots: slots
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // キャッシュをリフレッシュ
+            clearShiftSlotConfigCache();
+            await fetchShiftSlotConfig();
+        }
+
+        return result;
+    } catch (error) {
+        console.error('[importShiftSlotsToGAS] エラー:', error);
+        return { success: false, error: error.message };
     }
 }
 
