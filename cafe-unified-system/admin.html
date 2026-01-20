@@ -239,6 +239,19 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- GAS接続テスト -->
+                <div class="card">
+                    <h3 class="card__title">データベース接続テスト</h3>
+                    <p class="card__note">GAS（Google Apps Script）との接続状態を確認できます。</p>
+                    <div class="button-group" style="margin-bottom: 16px;">
+                        <button type="button" id="btnTestGAS" class="btn btn--secondary">接続テスト実行</button>
+                        <button type="button" id="btnRefreshData" class="btn btn--secondary">データ再読み込み</button>
+                    </div>
+                    <div id="gasTestResult" class="gas-test-result" style="display: none;">
+                        <!-- JavaScriptで生成 -->
+                    </div>
+                </div>
             </section>
 
             <!-- スタッフ管理タブ -->

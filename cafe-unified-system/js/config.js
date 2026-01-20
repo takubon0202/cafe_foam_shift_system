@@ -1472,3 +1472,161 @@ function getAllShiftSlots() {
 
     return result;
 }
+
+// =======================================================================
+// GAS接続テスト・デバッグ機能
+// =======================================================================
+
+/**
+ * GAS接続をテスト
+ * @returns {Promise<Object>} テスト結果
+ */
+async function testGASConnection() {
+    console.log('=== GAS接続テスト開始 ===');
+
+    const result = {
+        configValid: false,
+        gasUrl: null,
+        statusCheck: null,
+        getShiftSlotConfig: null,
+        errors: []
+    };
+
+    // 1. 設定確認
+    result.configValid = isConfigValid();
+    result.gasUrl = getGasUrl();
+    console.log('[テスト1] 設定有効:', result.configValid);
+    console.log('[テスト1] GAS URL:', result.gasUrl);
+
+    if (!result.configValid) {
+        result.errors.push('GAS URLが設定されていません');
+        console.error('[テスト1] 失敗: GAS URLが未設定');
+        return result;
+    }
+
+    // 2. ステータスチェック（GASが動作しているか）
+    try {
+        console.log('[テスト2] ステータスチェック...');
+        const statusResponse = await fetch(`${result.gasUrl}?action=status`, {
+            method: 'GET',
+            redirect: 'follow'
+        });
+
+        console.log('[テスト2] ステータスコード:', statusResponse.status);
+
+        if (!statusResponse.ok) {
+            throw new Error(`HTTP ${statusResponse.status}`);
+        }
+
+        const statusText = await statusResponse.text();
+        console.log('[テスト2] レスポンス:', statusText.substring(0, 200));
+
+        // HTMLレスポンスの検出
+        if (statusText.trim().startsWith('<!DOCTYPE') || statusText.trim().startsWith('<html')) {
+            result.statusCheck = { success: false, error: 'HTMLレスポンス（GAS未デプロイまたは権限エラー）' };
+            result.errors.push('GASが正しくデプロイされていません。Apps Scriptで再デプロイしてください。');
+        } else {
+            try {
+                const statusJson = JSON.parse(statusText);
+                result.statusCheck = statusJson;
+                console.log('[テスト2] 成功:', statusJson);
+            } catch (e) {
+                result.statusCheck = { success: false, error: 'JSONパースエラー', raw: statusText.substring(0, 100) };
+                result.errors.push('GASレスポンスの形式が不正です');
+            }
+        }
+    } catch (error) {
+        result.statusCheck = { success: false, error: error.message };
+        result.errors.push(`ステータスチェック失敗: ${error.message}`);
+        console.error('[テスト2] エラー:', error);
+    }
+
+    // 3. シフト枠設定取得テスト
+    try {
+        console.log('[テスト3] シフト枠設定取得...');
+        const configResponse = await fetch(`${result.gasUrl}?action=getShiftSlotConfig`, {
+            method: 'GET',
+            redirect: 'follow'
+        });
+
+        console.log('[テスト3] ステータスコード:', configResponse.status);
+
+        if (!configResponse.ok) {
+            throw new Error(`HTTP ${configResponse.status}`);
+        }
+
+        const configText = await configResponse.text();
+        console.log('[テスト3] レスポンス:', configText.substring(0, 300));
+
+        if (configText.trim().startsWith('<!DOCTYPE') || configText.trim().startsWith('<html')) {
+            result.getShiftSlotConfig = { success: false, error: 'HTMLレスポンス' };
+            result.errors.push('シフト枠設定取得でHTMLが返されました');
+        } else {
+            try {
+                const configJson = JSON.parse(configText);
+                result.getShiftSlotConfig = configJson;
+
+                if (configJson.success) {
+                    const slotCount = Object.keys(configJson.slots || {}).length;
+                    console.log('[テスト3] 成功: ', slotCount, '日分のシフト枠');
+                } else {
+                    result.errors.push(`シフト枠設定取得エラー: ${configJson.error}`);
+                }
+            } catch (e) {
+                result.getShiftSlotConfig = { success: false, error: 'JSONパースエラー', raw: configText.substring(0, 100) };
+                result.errors.push('シフト枠設定のJSONパースに失敗');
+            }
+        }
+    } catch (error) {
+        result.getShiftSlotConfig = { success: false, error: error.message };
+        result.errors.push(`シフト枠設定取得失敗: ${error.message}`);
+        console.error('[テスト3] エラー:', error);
+    }
+
+    // 結果サマリー
+    console.log('=== GAS接続テスト結果 ===');
+    console.log('設定有効:', result.configValid);
+    console.log('ステータスチェック:', result.statusCheck?.success ? '成功' : '失敗');
+    console.log('シフト枠設定取得:', result.getShiftSlotConfig?.success ? '成功' : '失敗');
+    console.log('エラー:', result.errors.length > 0 ? result.errors : 'なし');
+
+    return result;
+}
+
+/**
+ * デバッグ情報を取得
+ * @returns {Object} デバッグ情報
+ */
+function getDebugInfo() {
+    const customSlots = getCustomShiftSlots();
+    const operationDates = getOperationDates();
+    const weeks = getWeeks();
+
+    return {
+        timestamp: new Date().toISOString(),
+        config: {
+            gasUrl: getGasUrl(),
+            configValid: isConfigValid(),
+            env: CONFIG.ENV,
+            databaseStatus: getDatabaseConnectionStatus()
+        },
+        data: {
+            customSlotsCount: customSlots ? Object.keys(customSlots).length : 0,
+            customSlotsDates: customSlots ? Object.keys(customSlots) : [],
+            operationDatesCount: operationDates.length,
+            weeksCount: weeks.length
+        },
+        cache: {
+            shiftSlotConfigCached: _shiftSlotConfigCache !== null,
+            loading: _shiftSlotConfigLoading
+        },
+        localStorage: {
+            hasCustomSlots: !!localStorage.getItem('cafe_custom_shift_slots'),
+            hasShifts: !!localStorage.getItem(CONFIG.STORAGE_KEYS.SHIFTS)
+        }
+    };
+}
+
+// コンソールからアクセスできるようにグローバルに公開
+window.testGASConnection = testGASConnection;
+window.getDebugInfo = getDebugInfo;

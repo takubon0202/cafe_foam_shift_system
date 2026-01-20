@@ -59,6 +59,10 @@
         btnClearData: document.getElementById('btnClearData'),
         btnMigrate: document.getElementById('btnMigrate'),
         migrationSection: document.getElementById('migrationSection'),
+        // GASテスト
+        btnTestGAS: document.getElementById('btnTestGAS'),
+        btnRefreshData: document.getElementById('btnRefreshData'),
+        gasTestResult: document.getElementById('gasTestResult'),
         // その他
         btnLogout: document.getElementById('btnLogout')
     };
@@ -159,6 +163,14 @@
         elements.btnExportData.addEventListener('click', handleExportData);
         elements.btnClearData.addEventListener('click', handleClearData);
         elements.btnMigrate.addEventListener('click', handleMigration);
+
+        // GASテスト
+        if (elements.btnTestGAS) {
+            elements.btnTestGAS.addEventListener('click', handleTestGAS);
+        }
+        if (elements.btnRefreshData) {
+            elements.btnRefreshData.addEventListener('click', handleRefreshData);
+        }
 
         // ログアウト
         elements.btnLogout.addEventListener('click', handleLogout);
@@ -963,6 +975,133 @@
         elements.adminSection.style.display = 'none';
         elements.authSection.style.display = 'flex';
         elements.adminPassword.value = '';
+    }
+
+    // ========== GAS接続テスト ==========
+
+    /**
+     * GAS接続テストを実行
+     */
+    async function handleTestGAS() {
+        if (!elements.gasTestResult) return;
+
+        elements.gasTestResult.style.display = 'block';
+        elements.gasTestResult.innerHTML = '<p>テスト実行中...</p>';
+
+        try {
+            if (typeof testGASConnection !== 'function') {
+                throw new Error('testGASConnection関数が見つかりません');
+            }
+
+            const result = await testGASConnection();
+
+            let html = '<div class="gas-test-detail">';
+
+            // 設定情報
+            html += '<div class="test-section">';
+            html += '<h4>設定情報</h4>';
+            html += `<p>GAS URL: <code>${result.gasUrl || '未設定'}</code></p>`;
+            html += `<p>設定有効: ${result.configValid ? '✅ はい' : '❌ いいえ'}</p>`;
+            html += '</div>';
+
+            // ステータスチェック
+            html += '<div class="test-section">';
+            html += '<h4>ステータスチェック</h4>';
+            if (result.statusCheck) {
+                if (result.statusCheck.success) {
+                    html += `<p>✅ 成功 - バージョン: ${result.statusCheck.version || '不明'}</p>`;
+                } else {
+                    html += `<p>❌ 失敗 - ${result.statusCheck.error}</p>`;
+                }
+            } else {
+                html += '<p>❌ 未実行</p>';
+            }
+            html += '</div>';
+
+            // シフト枠設定取得
+            html += '<div class="test-section">';
+            html += '<h4>シフト枠設定取得</h4>';
+            if (result.getShiftSlotConfig) {
+                if (result.getShiftSlotConfig.success) {
+                    const slotCount = Object.keys(result.getShiftSlotConfig.slots || {}).length;
+                    html += `<p>✅ 成功 - ${slotCount}日分のシフト枠</p>`;
+                } else {
+                    html += `<p>❌ 失敗 - ${result.getShiftSlotConfig.error}</p>`;
+                }
+            } else {
+                html += '<p>❌ 未実行</p>';
+            }
+            html += '</div>';
+
+            // エラー一覧
+            if (result.errors.length > 0) {
+                html += '<div class="test-section test-section--error">';
+                html += '<h4>エラー</h4>';
+                html += '<ul>';
+                result.errors.forEach(err => {
+                    html += `<li>${Utils.escapeHtml(err)}</li>`;
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+
+            // 対処法
+            if (result.errors.length > 0) {
+                html += '<div class="test-section test-section--help">';
+                html += '<h4>対処法</h4>';
+                html += '<ol>';
+                html += '<li>Google Apps Script エディタを開く</li>';
+                html += '<li>「デプロイ」→「新しいデプロイ」を選択</li>';
+                html += '<li>種類: ウェブアプリ、アクセス: 全員 を設定</li>';
+                html += '<li>デプロイ後、新しいURLをconfig.jsに設定</li>';
+                html += '</ol>';
+                html += '</div>';
+            }
+
+            html += '</div>';
+
+            elements.gasTestResult.innerHTML = html;
+
+        } catch (error) {
+            elements.gasTestResult.innerHTML = `
+                <div class="test-section test-section--error">
+                    <h4>テストエラー</h4>
+                    <p>${Utils.escapeHtml(error.message)}</p>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * データを再読み込み
+     */
+    async function handleRefreshData() {
+        try {
+            Utils.showLoading(true, 'データを再読み込み中...');
+
+            // キャッシュをクリア
+            if (typeof clearShiftSlotConfigCache === 'function') {
+                clearShiftSlotConfigCache();
+            }
+
+            // GASから再取得
+            if (typeof fetchShiftSlotConfig === 'function') {
+                await fetchShiftSlotConfig(true);
+            }
+
+            // 画面を再描画
+            loadData();
+            renderCurrentShiftConfig();
+            populateShiftDateSelect();
+
+            Utils.showMessage('データを再読み込みしました', 'success');
+
+        } catch (error) {
+            console.error('[handleRefreshData] エラー:', error);
+            Utils.showMessage('データの再読み込みに失敗しました: ' + error.message, 'error');
+        } finally {
+            Utils.showLoading(false);
+        }
     }
 
     // ========== インポート機能 ==========
