@@ -799,6 +799,10 @@
             Utils.showMessage('日付を選択してください', 'error');
             return;
         }
+        if (!label.trim()) {
+            Utils.showMessage('枠名を入力してください', 'error');
+            return;
+        }
         if (!start || !end) {
             Utils.showMessage('開始時刻と終了時刻を入力してください', 'error');
             return;
