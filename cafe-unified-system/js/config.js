@@ -705,18 +705,40 @@ async function saveShiftSlotToGAS(dateStr, slot) {
 
     try {
         const url = getGasUrl();
+        console.log('[saveShiftSlotToGAS] GAS URL:', url);
+
+        const requestBody = JSON.stringify({
+            action: 'saveShiftSlot',
+            dateStr: dateStr,
+            slot: slot
+        });
+        console.log('[saveShiftSlotToGAS] リクエスト:', requestBody);
+
         const response = await fetch(url, {
             method: 'POST',
-            mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'saveShiftSlot',
-                dateStr: dateStr,
-                slot: slot
-            })
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: requestBody
         });
 
-        const result = await response.json();
+        console.log('[saveShiftSlotToGAS] レスポンスステータス:', response.status);
+
+        const responseText = await response.text();
+        console.log('[saveShiftSlotToGAS] レスポンス:', responseText.substring(0, 200));
+
+        // HTMLレスポンスの検出
+        if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+            console.error('[saveShiftSlotToGAS] HTMLレスポンス - GASが正しくデプロイされていません');
+            throw new Error('GASが正しくデプロイされていません');
+        }
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('[saveShiftSlotToGAS] JSONパースエラー:', parseError);
+            throw new Error('レスポンスの解析に失敗しました');
+        }
 
         if (result.success) {
             // キャッシュを更新
@@ -768,18 +790,40 @@ async function deleteShiftSlotFromGAS(dateStr, slotId) {
 
     try {
         const url = getGasUrl();
+        console.log('[deleteShiftSlotFromGAS] GAS URL:', url);
+
+        const requestBody = JSON.stringify({
+            action: 'deleteShiftSlotConfig',
+            dateStr: dateStr,
+            slotId: slotId
+        });
+        console.log('[deleteShiftSlotFromGAS] リクエスト:', requestBody);
+
         const response = await fetch(url, {
             method: 'POST',
-            mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'deleteShiftSlotConfig',
-                dateStr: dateStr,
-                slotId: slotId
-            })
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: requestBody
         });
 
-        const result = await response.json();
+        console.log('[deleteShiftSlotFromGAS] レスポンスステータス:', response.status);
+
+        const responseText = await response.text();
+        console.log('[deleteShiftSlotFromGAS] レスポンス:', responseText.substring(0, 200));
+
+        // HTMLレスポンスの検出
+        if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+            console.error('[deleteShiftSlotFromGAS] HTMLレスポンス - GASが正しくデプロイされていません');
+            throw new Error('GASが正しくデプロイされていません');
+        }
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('[deleteShiftSlotFromGAS] JSONパースエラー:', parseError);
+            throw new Error('レスポンスの解析に失敗しました');
+        }
 
         if (result.success) {
             // キャッシュを更新
