@@ -691,16 +691,32 @@ function saveCustomShiftSlots(slots) {
  * @returns {Promise<Object>} 結果
  */
 async function saveShiftSlotToGAS(dateStr, slot) {
-    if (!isConfigValid()) {
-        console.warn('[saveShiftSlotToGAS] GAS未設定、ローカルのみに保存');
-        // ローカルのみに保存
+    console.log('[saveShiftSlotToGAS] 開始:', dateStr, slot);
+
+    // ローカル保存用のヘルパー関数
+    const saveToLocal = (slotData, isLocalOnly = false) => {
+        console.log('[saveShiftSlotToGAS] ローカルに保存');
         const customSlots = getCustomShiftSlots() || {};
         if (!customSlots[dateStr]) {
             customSlots[dateStr] = [];
         }
-        customSlots[dateStr].push(slot);
+        // IDを生成
+        const newSlot = {
+            id: slotData.id || `SLOT_${Date.now()}_${customSlots[dateStr].length}`,
+            label: slotData.label || `枠${customSlots[dateStr].length + 1}`,
+            start: slotData.start,
+            end: slotData.end,
+            requiredStaff: slotData.requiredStaff || 3
+        };
+        customSlots[dateStr].push(newSlot);
         saveCustomShiftSlots(customSlots);
-        return { success: true, slot: slot };
+        updateShiftSlotConfigCache(customSlots);
+        return { success: true, slot: newSlot, local: isLocalOnly };
+    };
+
+    if (!isConfigValid()) {
+        console.warn('[saveShiftSlotToGAS] GAS未設定、ローカルのみに保存');
+        return saveToLocal(slot, true);
     }
 
     try {
@@ -723,13 +739,24 @@ async function saveShiftSlotToGAS(dateStr, slot) {
 
         console.log('[saveShiftSlotToGAS] レスポンスステータス:', response.status);
 
+        if (!response.ok) {
+            console.warn('[saveShiftSlotToGAS] HTTPエラー:', response.status);
+            // ローカルフォールバック
+            const localResult = saveToLocal(slot, true);
+            localResult.warning = `GAS通信エラー(${response.status})。ローカルに保存しました。`;
+            return localResult;
+        }
+
         const responseText = await response.text();
-        console.log('[saveShiftSlotToGAS] レスポンス:', responseText.substring(0, 200));
+        console.log('[saveShiftSlotToGAS] レスポンス:', responseText.substring(0, 300));
 
         // HTMLレスポンスの検出
         if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
             console.error('[saveShiftSlotToGAS] HTMLレスポンス - GASが正しくデプロイされていません');
-            throw new Error('GASが正しくデプロイされていません');
+            // ローカルフォールバック
+            const localResult = saveToLocal(slot, true);
+            localResult.warning = 'GASが正しくデプロイされていません。ローカルに保存しました。';
+            return localResult;
         }
 
         let result;
@@ -737,7 +764,10 @@ async function saveShiftSlotToGAS(dateStr, slot) {
             result = JSON.parse(responseText);
         } catch (parseError) {
             console.error('[saveShiftSlotToGAS] JSONパースエラー:', parseError);
-            throw new Error('レスポンスの解析に失敗しました');
+            // ローカルフォールバック
+            const localResult = saveToLocal(slot, true);
+            localResult.warning = 'GASレスポンスの解析に失敗。ローカルに保存しました。';
+            return localResult;
         }
 
         if (result.success) {
@@ -754,12 +784,23 @@ async function saveShiftSlotToGAS(dateStr, slot) {
                 customSlots[dateStr].push(result.slot);
             }
             updateShiftSlotConfigCache(customSlots);
+            setDatabaseConnectionStatus('connected');
+            console.log('[saveShiftSlotToGAS] GAS保存成功');
+            return result;
+        } else {
+            console.warn('[saveShiftSlotToGAS] GASエラー:', result.error);
+            // ローカルフォールバック
+            const localResult = saveToLocal(slot, true);
+            localResult.warning = `GASエラー: ${result.error}。ローカルに保存しました。`;
+            return localResult;
         }
-
-        return result;
     } catch (error) {
-        console.error('[saveShiftSlotToGAS] エラー:', error);
-        return { success: false, error: error.message };
+        console.error('[saveShiftSlotToGAS] 通信エラー:', error);
+        // ローカルフォールバック
+        const localResult = saveToLocal(slot, true);
+        localResult.warning = `通信エラー: ${error.message}。ローカルに保存しました。`;
+        setDatabaseConnectionStatus('disconnected');
+        return localResult;
     }
 }
 

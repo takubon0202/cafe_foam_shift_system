@@ -773,11 +773,15 @@
     }
 
     async function handleAddShiftSlot() {
+        console.log('[handleAddShiftSlot] 開始');
+
         const dateStr = elements.newShiftDate?.value;
         const label = elements.newShiftLabel?.value || '';
         const start = elements.newShiftStart?.value;
         const end = elements.newShiftEnd?.value;
         const requiredStaff = parseInt(elements.newShiftStaff?.value) || 3;
+
+        console.log('[handleAddShiftSlot] 入力値:', { dateStr, label, start, end, requiredStaff });
 
         if (!dateStr) {
             Utils.showMessage('日付を選択してください', 'error');
@@ -803,27 +807,42 @@
         try {
             Utils.showLoading(true, 'シフト枠を登録中...');
 
+            let result;
+
             // GAS API経由で保存
             if (typeof saveShiftSlotToGAS === 'function') {
-                const result = await saveShiftSlotToGAS(dateStr, slotData);
-                if (result.success) {
-                    Utils.showMessage(`${dateStr}に${result.slot?.label || label}（${start}〜${end}）を追加しました`, 'success');
-                } else {
-                    throw new Error(result.error || '保存に失敗しました');
-                }
+                console.log('[handleAddShiftSlot] saveShiftSlotToGAS を呼び出し');
+                result = await saveShiftSlotToGAS(dateStr, slotData);
+                console.log('[handleAddShiftSlot] 結果:', result);
             } else {
+                console.log('[handleAddShiftSlot] addShiftSlot を呼び出し（フォールバック）');
                 // フォールバック: ローカルのみ
                 const newSlot = addShiftSlot(dateStr, slotData);
-                if (newSlot) {
-                    Utils.showMessage(`${dateStr}に${newSlot.label}（${start}〜${end}）を追加しました`, 'success');
-                }
+                result = { success: !!newSlot, slot: newSlot, local: true };
             }
 
-            renderCurrentShiftConfig();
-            populateShiftDateSelect();
+            if (result.success) {
+                const slotLabel = result.slot?.label || label || '枠';
+                const message = `${dateStr}に${slotLabel}（${start}〜${end}）を追加しました`;
 
-            // フォームをリセット
-            if (elements.newShiftLabel) elements.newShiftLabel.value = '';
+                // 警告がある場合は警告表示、なければ成功表示
+                if (result.warning) {
+                    Utils.showMessage(message + '（' + result.warning + '）', 'warning');
+                } else if (result.local) {
+                    Utils.showMessage(message + '（ローカル保存）', 'success');
+                } else {
+                    Utils.showMessage(message + '（DB保存）', 'success');
+                }
+
+                // 画面を更新
+                renderCurrentShiftConfig();
+                populateShiftDateSelect();
+
+                // フォームをリセット
+                if (elements.newShiftLabel) elements.newShiftLabel.value = '';
+            } else {
+                throw new Error(result.error || '保存に失敗しました');
+            }
 
         } catch (error) {
             console.error('[handleAddShiftSlot] エラー:', error);
