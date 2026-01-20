@@ -10,8 +10,8 @@ const CONFIG = {
 
     // Google Apps Script WebアプリURL
     GAS_URL: {
-        production: 'https://script.google.com/macros/s/AKfycbxqWXUs4Z7XHWtOamIxp0NV3xFwLlU2MytWoLx8-bB8XugyuyhaO_MfTAdtwwQumVQ2/exec',
-        development: 'https://script.google.com/macros/s/AKfycbxqWXUs4Z7XHWtOamIxp0NV3xFwLlU2MytWoLx8-bB8XugyuyhaO_MfTAdtwwQumVQ2/exec'
+        production: 'https://script.google.com/macros/s/AKfycbz4iHtvxIjd3w0Ci97JYrpKg2jx4VbjsiaDQP7GppKYiPYdedbPYv95nwM2YfEjocGV4Q/exec',
+        development: 'https://script.google.com/macros/s/AKfycbz4iHtvxIjd3w0Ci97JYrpKg2jx4VbjsiaDQP7GppKYiPYdedbPYv95nwM2YfEjocGV4Q/exec'
     },
 
     // 現在の環境
