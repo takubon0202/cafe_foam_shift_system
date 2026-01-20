@@ -8,7 +8,6 @@
 
     const elements = {
         filterStaff: document.getElementById('filterStaff'),
-        periodInfo: document.getElementById('periodInfo'),
         monthTitle: document.getElementById('monthTitle'),
         btnPrevMonth: document.getElementById('btnPrevMonth'),
         btnNextMonth: document.getElementById('btnNextMonth'),
@@ -109,7 +108,6 @@
             console.log('[calendar:init] 表示月:', currentDisplayMonth);
 
             populateStaffFilter();
-            renderPeriodInfo();
             setupEventListeners();
             updateTodayButton();
             await loadShiftData();
@@ -119,48 +117,6 @@
         } finally {
             Utils.showLoading(false);
         }
-    }
-
-    /**
-     * 営業期間情報を表示
-     */
-    function renderPeriodInfo() {
-        if (!elements.periodInfo) return;
-
-        // データベースから動的に期間を取得
-        const period = getOperationPeriod();
-
-        // 期間が設定されていない場合
-        if (!period.start || !period.end) {
-            elements.periodInfo.innerHTML = `
-                <div class="period-info__badge">シフト枠未登録</div>
-                <div class="period-info__dates">管理画面からシフト枠を登録してください</div>
-            `;
-            return;
-        }
-
-        const startDate = parseDateStr(period.start);
-        const endDate = parseDateStr(period.end);
-
-        const formatDate = (d) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-
-        let html = `
-            <div class="period-info__badge">営業期間</div>
-            <div class="period-info__dates">${formatDate(startDate)} 〜 ${formatDate(endDate)}</div>
-        `;
-
-        // 特別日情報
-        if (CONFIG.SPECIAL_DATES) {
-            const specialDays = Object.entries(CONFIG.SPECIAL_DATES).map(([date, info]) => {
-                const d = parseDateStr(date);
-                return `${d.getMonth() + 1}/${d.getDate()} ${info.label}`;
-            });
-            if (specialDays.length > 0) {
-                html += `<div class="period-info__special">${specialDays.join(' / ')}</div>`;
-            }
-        }
-
-        elements.periodInfo.innerHTML = html;
     }
 
     /**
