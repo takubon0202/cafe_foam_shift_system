@@ -125,7 +125,7 @@
         const html = availableSlots.map(slot => `
             <button type="button" class="slot-btn" data-slot="${slot.id}">
                 <span class="slot-btn__label">${slot.label}</span>
-                <span class="slot-btn__time">${slot.start}〜${slot.end}</span>
+                <span class="slot-btn__time">${Utils.formatTimeStr(slot.start)}〜${Utils.formatTimeStr(slot.end)}</span>
             </button>
         `).join('');
 

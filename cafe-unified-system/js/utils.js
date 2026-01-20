@@ -47,6 +47,49 @@ const Utils = {
     },
 
     /**
+     * 時刻を "HH:MM" 形式にフォーマット
+     * GASから返される様々な形式に対応
+     * @param {string|Date} timeValue - 時刻値
+     * @returns {string} "HH:MM" 形式の時刻
+     */
+    formatTimeStr(timeValue) {
+        if (!timeValue) return '';
+
+        // 既に "HH:MM" 形式の場合はそのまま返す
+        if (typeof timeValue === 'string' && /^\d{1,2}:\d{2}$/.test(timeValue)) {
+            return timeValue;
+        }
+
+        // "HH:MM:SS" 形式の場合は秒を除去
+        if (typeof timeValue === 'string' && /^\d{1,2}:\d{2}:\d{2}$/.test(timeValue)) {
+            return timeValue.substring(0, 5);
+        }
+
+        // Date オブジェクトまたは日付文字列の場合
+        try {
+            let date;
+            if (timeValue instanceof Date) {
+                date = timeValue;
+            } else if (typeof timeValue === 'string') {
+                date = new Date(timeValue);
+            } else {
+                return String(timeValue);
+            }
+
+            if (isNaN(date.getTime())) {
+                return String(timeValue);
+            }
+
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+        } catch (e) {
+            console.warn('[formatTimeStr] 変換エラー:', timeValue, e);
+            return String(timeValue);
+        }
+    },
+
+    /**
      * 日付を短い日本語形式でフォーマット（例: 1/15（木））
      * @param {string} dateStr - YYYY-MM-DD形式の日付文字列
      * @returns {string} フォーマットされた日付文字列

@@ -30,6 +30,52 @@
     let currentDisplayMonth = null; // 現在表示中の月 (Date)
 
     /**
+     * 時刻を "HH:MM" 形式にフォーマット
+     * GASから返される様々な形式に対応
+     * - "14:40" (既にフォーマット済み)
+     * - Date オブジェクト
+     * - "Sat Dec 30 1899 14:40:00 GMT+0900" (スプレッドシートの時刻形式)
+     * - ISO文字列
+     */
+    function formatTimeStr(timeValue) {
+        if (!timeValue) return '';
+
+        // 既に "HH:MM" 形式の場合はそのまま返す
+        if (typeof timeValue === 'string' && /^\d{1,2}:\d{2}$/.test(timeValue)) {
+            return timeValue;
+        }
+
+        // "HH:MM:SS" 形式の場合は秒を除去
+        if (typeof timeValue === 'string' && /^\d{1,2}:\d{2}:\d{2}$/.test(timeValue)) {
+            return timeValue.substring(0, 5);
+        }
+
+        // Date オブジェクトまたは日付文字列の場合
+        try {
+            let date;
+            if (timeValue instanceof Date) {
+                date = timeValue;
+            } else if (typeof timeValue === 'string') {
+                // スプレッドシートの時刻形式やISO形式に対応
+                date = new Date(timeValue);
+            } else {
+                return String(timeValue);
+            }
+
+            if (isNaN(date.getTime())) {
+                return String(timeValue);
+            }
+
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+        } catch (e) {
+            console.warn('[formatTimeStr] 変換エラー:', timeValue, e);
+            return String(timeValue);
+        }
+    }
+
+    /**
      * 初期化
      */
     async function init() {
@@ -526,7 +572,7 @@
                 html += `
                     <div class="${statusClass}">
                         <div class="day-detail__slot-header">
-                            <span class="day-detail__slot-label">${slot.label}（${slot.start}〜${slot.end}）</span>
+                            <span class="day-detail__slot-label">${slot.label}（${formatTimeStr(slot.start)}〜${formatTimeStr(slot.end)}）</span>
                             <span class="day-detail__slot-count">${count}/${required}名</span>
                         </div>
                         <div class="day-detail__staff">

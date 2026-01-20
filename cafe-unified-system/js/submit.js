@@ -374,7 +374,7 @@
                                         <span class="slot-radio__label">${slot.label}</span>
                                         ${statusBadge}
                                     </span>
-                                    <span class="slot-radio__time">${slot.start}〜${slot.end}</span>
+                                    <span class="slot-radio__time">${Utils.formatTimeStr(slot.start)}〜${Utils.formatTimeStr(slot.end)}</span>
                                 </span>
                             </label>
                         `;
@@ -488,7 +488,7 @@
             html += `
                 <li class="selection-item">
                     <span class="selection-week">${week ? week.label : weekKey}</span>
-                    <span class="selection-detail">${formatDateDisplay(sel.date)} ${sel.slot.label}（${sel.slot.start}〜${sel.slot.end}）</span>
+                    <span class="selection-detail">${formatDateDisplay(sel.date)} ${sel.slot.label}（${Utils.formatTimeStr(sel.slot.start)}〜${Utils.formatTimeStr(sel.slot.end)}）</span>
                 </li>
             `;
         });

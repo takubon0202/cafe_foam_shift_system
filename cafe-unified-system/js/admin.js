@@ -554,7 +554,7 @@
             html += `
                 <div class="shift-slot-admin">
                     <div class="shift-slot-admin__header">
-                        <span class="shift-slot-admin__label">${slot.label}（${slot.start}〜${slot.end}）</span>
+                        <span class="shift-slot-admin__label">${slot.label}（${Utils.formatTimeStr(slot.start)}〜${Utils.formatTimeStr(slot.end)}）</span>
                         <span class="shift-slot-admin__count">${slotShifts.length}/${required}</span>
                     </div>
                     <div class="shift-slot-admin__staff">
@@ -705,7 +705,7 @@
                     <div class="shift-config-slot">
                         <div class="shift-config-slot__info">
                             <span class="shift-config-slot__label">${slot.label}</span>
-                            <span class="shift-config-slot__time">${slot.start}〜${slot.end}</span>
+                            <span class="shift-config-slot__time">${Utils.formatTimeStr(slot.start)}〜${Utils.formatTimeStr(slot.end)}</span>
                             <span class="shift-config-slot__staff">必要人数: ${slot.requiredStaff || 3}名</span>
                         </div>
                         <button type="button" class="btn btn--small btn--danger btn-delete-slot"
