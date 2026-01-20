@@ -587,16 +587,37 @@ async function fetchShiftSlotConfig(forceRefresh = false) {
     _shiftSlotConfigLoadPromise = new Promise(async (resolve) => {
         try {
             const url = getGasUrl();
+            console.log('[fetchShiftSlotConfig] GAS URL:', url);
+
+            // GASへのGETリクエスト（CORSモードなしで送信）
             const response = await fetch(`${url}?action=getShiftSlotConfig`, {
                 method: 'GET',
-                mode: 'cors'
+                redirect: 'follow'
             });
+
+            console.log('[fetchShiftSlotConfig] レスポンスステータス:', response.status);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const result = await response.json();
+            const responseText = await response.text();
+            console.log('[fetchShiftSlotConfig] レスポンス:', responseText.substring(0, 200));
+
+            // HTMLレスポンスの検出（GASがデプロイされていない場合など）
+            if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+                console.error('[fetchShiftSlotConfig] HTMLレスポンスを受信 - GASが正しくデプロイされていない可能性があります');
+                throw new Error('GASが正しくデプロイされていません。新しいバージョンをデプロイしてください。');
+            }
+
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('[fetchShiftSlotConfig] JSONパースエラー:', parseError);
+                console.error('[fetchShiftSlotConfig] 受信データ:', responseText.substring(0, 500));
+                throw new Error('レスポンスのパースに失敗しました');
+            }
 
             if (result.success) {
                 const slots = result.slots || {};
@@ -852,7 +873,13 @@ async function importShiftSlotsToGAS(slots) {
 
             if (response.ok) {
                 const responseText = await response.text();
-                console.log('[importShiftSlotsToGAS] レスポンステキスト:', responseText);
+                console.log('[importShiftSlotsToGAS] レスポンステキスト:', responseText.substring(0, 300));
+
+                // HTMLレスポンスの検出（GASデプロイエラー）
+                if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+                    console.error('[importShiftSlotsToGAS] HTMLレスポンス受信 - GASが正しくデプロイされていません');
+                    throw new Error('GASが正しくデプロイされていません。Apps Scriptで新しいバージョンをデプロイしてください。');
+                }
 
                 if (responseText) {
                     try {
@@ -860,6 +887,7 @@ async function importShiftSlotsToGAS(slots) {
                         fetchSuccess = true;
                     } catch (parseError) {
                         console.warn('[importShiftSlotsToGAS] JSONパースエラー:', parseError);
+                        console.warn('[importShiftSlotsToGAS] 受信データ:', responseText.substring(0, 500));
                     }
                 }
             }
