@@ -792,9 +792,9 @@ async function importShiftSlotsToGAS(slots) {
     console.log('[importShiftSlotsToGAS] 開始:', slots.length, '件のシフト枠');
     console.log('[importShiftSlotsToGAS] データ:', JSON.stringify(slots, null, 2));
 
-    if (!isConfigValid()) {
-        console.warn('[importShiftSlotsToGAS] GAS未設定、ローカルのみに保存');
-        // ローカルのみに保存
+    // ローカル保存用のヘルパー関数
+    const saveToLocal = () => {
+        console.log('[importShiftSlotsToGAS] ローカルに保存');
         const customSlots = getCustomShiftSlots() || {};
         slots.forEach(slotData => {
             const dateStr = slotData.date;
@@ -811,7 +811,12 @@ async function importShiftSlotsToGAS(slots) {
             customSlots[dateStr].push(newSlot);
         });
         saveCustomShiftSlots(customSlots);
-        return { success: true, count: slots.length };
+        return { success: true, count: slots.length, local: true };
+    };
+
+    if (!isConfigValid()) {
+        console.warn('[importShiftSlotsToGAS] GAS未設定、ローカルのみに保存');
+        return saveToLocal();
     }
 
     try {
@@ -824,49 +829,113 @@ async function importShiftSlotsToGAS(slots) {
         });
         console.log('[importShiftSlotsToGAS] リクエストボディ:', requestBody);
 
-        // GASへのリクエスト（リダイレクトを許可）
-        const response = await fetch(url, {
-            method: 'POST',
-            mode: 'cors',
-            redirect: 'follow',
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: requestBody
-        });
+        // 方法1: fetch APIを使用（CORS対応）
+        let result = null;
+        let fetchSuccess = false;
 
-        console.log('[importShiftSlotsToGAS] レスポンスステータス:', response.status);
-        console.log('[importShiftSlotsToGAS] レスポンスOK:', response.ok);
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const responseText = await response.text();
-        console.log('[importShiftSlotsToGAS] レスポンステキスト:', responseText);
-
-        let result;
         try {
-            result = JSON.parse(responseText);
-        } catch (parseError) {
-            console.error('[importShiftSlotsToGAS] JSONパースエラー:', parseError);
-            throw new Error('サーバーからの応答を解析できませんでした');
+            // GASへのリクエスト - redirect: 'follow'でリダイレクトを自動追跡
+            // Content-Type: text/plain はGASのCORS制限を回避するため
+            const response = await fetch(url, {
+                method: 'POST',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8'
+                },
+                body: requestBody
+            });
+
+            console.log('[importShiftSlotsToGAS] レスポンスステータス:', response.status);
+            console.log('[importShiftSlotsToGAS] レスポンスOK:', response.ok);
+            console.log('[importShiftSlotsToGAS] レスポンスURL:', response.url);
+            console.log('[importShiftSlotsToGAS] レスポンスタイプ:', response.type);
+
+            if (response.ok) {
+                const responseText = await response.text();
+                console.log('[importShiftSlotsToGAS] レスポンステキスト:', responseText);
+
+                if (responseText) {
+                    try {
+                        result = JSON.parse(responseText);
+                        fetchSuccess = true;
+                    } catch (parseError) {
+                        console.warn('[importShiftSlotsToGAS] JSONパースエラー:', parseError);
+                    }
+                }
+            }
+        } catch (fetchError) {
+            console.warn('[importShiftSlotsToGAS] fetch失敗:', fetchError.message);
         }
 
-        console.log('[importShiftSlotsToGAS] 結果:', result);
+        // 方法2: fetchが失敗した場合、GETパラメータでのフォールバック（小さいデータのみ）
+        if (!fetchSuccess && slots.length <= 10) {
+            console.log('[importShiftSlotsToGAS] GETフォールバックを試行');
+            try {
+                // URLエンコードしたデータをGETで送信（小さいデータ用）
+                const encodedData = encodeURIComponent(JSON.stringify({
+                    action: 'importShiftSlots',
+                    slots: slots
+                }));
 
-        if (result.success) {
-            // キャッシュをリフレッシュ
-            clearShiftSlotConfigCache();
-            await fetchShiftSlotConfig(true);
-            setDatabaseConnectionStatus('connected');
+                // データが長すぎる場合はスキップ
+                if (encodedData.length < 2000) {
+                    const getUrl = `${url}?data=${encodedData}`;
+                    const getResponse = await fetch(getUrl, {
+                        method: 'GET',
+                        redirect: 'follow'
+                    });
+
+                    if (getResponse.ok) {
+                        const getResponseText = await getResponse.text();
+                        if (getResponseText) {
+                            try {
+                                result = JSON.parse(getResponseText);
+                                fetchSuccess = true;
+                                console.log('[importShiftSlotsToGAS] GETフォールバック成功');
+                            } catch (e) {
+                                console.warn('[importShiftSlotsToGAS] GETレスポンスパースエラー');
+                            }
+                        }
+                    }
+                }
+            } catch (getError) {
+                console.warn('[importShiftSlotsToGAS] GETフォールバック失敗:', getError.message);
+            }
         }
 
-        return result;
+        // GAS通信が成功した場合
+        if (fetchSuccess && result) {
+            console.log('[importShiftSlotsToGAS] 結果:', result);
+
+            if (result.success) {
+                // キャッシュをリフレッシュ
+                clearShiftSlotConfigCache();
+                await fetchShiftSlotConfig(true);
+                setDatabaseConnectionStatus('connected');
+                return result;
+            } else {
+                // GASがエラーを返した場合
+                console.warn('[importShiftSlotsToGAS] GASエラー:', result.error);
+                throw new Error(result.error || 'GASでエラーが発生しました');
+            }
+        }
+
+        // GAS通信に失敗した場合、ローカルに保存してユーザーに通知
+        console.warn('[importShiftSlotsToGAS] GAS通信失敗、ローカルにフォールバック');
+        const localResult = saveToLocal();
+        localResult.warning = 'GASへの保存に失敗したため、ローカルに保存しました。後でデータベースに移行してください。';
+        setDatabaseConnectionStatus('disconnected');
+        return localResult;
+
     } catch (error) {
         console.error('[importShiftSlotsToGAS] エラー:', error);
         setDatabaseConnectionStatus('disconnected');
-        return { success: false, error: error.message };
+
+        // エラー時もローカルに保存を試みる
+        console.log('[importShiftSlotsToGAS] エラー発生、ローカルフォールバック');
+        const localResult = saveToLocal();
+        localResult.warning = `GASエラー: ${error.message}。ローカルに保存しました。`;
+        return localResult;
     }
 }
 

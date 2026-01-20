@@ -149,59 +149,27 @@ function getSlotConfigSheet() {
  */
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
-    let result;
-
-    switch (data.action) {
-      case 'submitShifts':
-        result = handleSubmitShifts(data.submissions);
-        break;
-      case 'punch':
-        result = handlePunch(data);
-        break;
-      case 'getShifts':
-        result = handleGetShifts(data);
-        break;
-      case 'getClockRecords':
-        result = handleGetClockRecords(data);
-        break;
-      case 'getAllShifts':
-        result = handleGetAllShifts();
-        break;
-      case 'getAllClockRecords':
-        result = handleGetAllClockRecords();
-        break;
-      case 'deleteShifts':
-        result = handleDeleteShifts(data);
-        break;
-      case 'deleteShift':
-        result = handleDeleteShiftById(data.shiftId);
-        break;
-      case 'checkViolations':
-        result = handleCheckViolations();
-        break;
-      case 'getStats':
-        result = handleGetStats();
-        break;
-      case 'getShiftSlotConfig':
-        result = handleGetShiftSlotConfig();
-        break;
-      case 'saveShiftSlot':
-        result = handleSaveShiftSlot(data);
-        break;
-      case 'deleteShiftSlotConfig':
-        result = handleDeleteShiftSlotConfig(data);
-        break;
-      case 'importShiftSlots':
-        result = handleImportShiftSlots(data.slots);
-        break;
-      default:
-        result = { success: false, error: 'Unknown action' };
+    // POSTデータをパース
+    let data;
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (parseError) {
+      // パースに失敗した場合はエラーを返す
+      return createResponse({
+        success: false,
+        error: 'JSONパースエラー: ' + parseError.toString(),
+        receivedData: e.postData ? e.postData.contents.substring(0, 200) : 'null'
+      });
     }
 
-    return createResponse(result);
+    // 共通のリクエストハンドラを使用
+    return handleDataRequest(data);
   } catch (error) {
-    return createResponse({ success: false, error: error.toString() });
+    return createResponse({
+      success: false,
+      error: error.toString(),
+      stack: error.stack
+    });
   }
 }
 
@@ -210,6 +178,16 @@ function doPost(e) {
  */
 function doGet(e) {
   try {
+    // dataパラメータがある場合はPOSTと同様に処理（CORSフォールバック用）
+    if (e.parameter.data) {
+      try {
+        const data = JSON.parse(e.parameter.data);
+        return handleDataRequest(data);
+      } catch (parseError) {
+        return createResponse({ success: false, error: 'データのパースに失敗しました: ' + parseError.toString() });
+      }
+    }
+
     const action = e.parameter.action || 'status';
     let result;
 
@@ -240,7 +218,7 @@ function doGet(e) {
         result = {
           success: true,
           message: 'Cafe Unified System API',
-          version: '1.1'
+          version: '1.2'
         };
     }
 
@@ -248,6 +226,62 @@ function doGet(e) {
   } catch (error) {
     return createResponse({ success: false, error: error.toString() });
   }
+}
+
+/**
+ * データリクエストを処理（POST/GET共通）
+ */
+function handleDataRequest(data) {
+  let result;
+
+  switch (data.action) {
+    case 'submitShifts':
+      result = handleSubmitShifts(data.submissions);
+      break;
+    case 'punch':
+      result = handlePunch(data);
+      break;
+    case 'getShifts':
+      result = handleGetShifts(data);
+      break;
+    case 'getClockRecords':
+      result = handleGetClockRecords(data);
+      break;
+    case 'getAllShifts':
+      result = handleGetAllShifts();
+      break;
+    case 'getAllClockRecords':
+      result = handleGetAllClockRecords();
+      break;
+    case 'deleteShifts':
+      result = handleDeleteShifts(data);
+      break;
+    case 'deleteShift':
+      result = handleDeleteShiftById(data.shiftId);
+      break;
+    case 'checkViolations':
+      result = handleCheckViolations();
+      break;
+    case 'getStats':
+      result = handleGetStats();
+      break;
+    case 'getShiftSlotConfig':
+      result = handleGetShiftSlotConfig();
+      break;
+    case 'saveShiftSlot':
+      result = handleSaveShiftSlot(data);
+      break;
+    case 'deleteShiftSlotConfig':
+      result = handleDeleteShiftSlotConfig(data);
+      break;
+    case 'importShiftSlots':
+      result = handleImportShiftSlots(data.slots);
+      break;
+    default:
+      result = { success: false, error: 'Unknown action: ' + data.action };
+  }
+
+  return createResponse(result);
 }
 
 /**
